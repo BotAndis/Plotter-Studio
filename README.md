@@ -2,8 +2,6 @@
 
 A browser-based creative coding assistant for pen plotter art. Describe a sketch in plain language — get runnable Processing Java and p5.js code, a live preview, and export-ready files.
 
-![Dark theme UI with chat, code, and preview panels](https://raw.githubusercontent.com/BotAndis/Plotter-Studio/claude/new-session-p80Ya/plotter_studio.html)
-
 ## Features
 
 - **AI-powered sketch generation** — describe your idea, get complete Processing `.pde` and p5.js code
