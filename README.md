@@ -87,7 +87,7 @@ Best for quick usage in a Claude artifact environment.
 4. Download generated files (`.pde`, `.js`, `.html`) from the response buttons.
 
 Notes:
-- In `claude.ai` contexts, Anthropic auth can be auto-injected.
+- In `claude.ai` contexts, Anthropic authentication is automatically handled by the environment.
 - Gemini still requires a user API key.
 - SAIA requires Academic Cloud key (+ CORS proxy if direct browser requests are blocked).
 
@@ -123,7 +123,7 @@ You can set keys through several paths:
 5. **Code-level fallback path (Academic Cloud only)**  
    `ACADEMIC_CLOUD_KEY_DEFAULT` variable in both HTML files can provide a default SAIA key.
 
-> Security: localStorage and in-file keys are sensitive. Do not commit real keys.
+> ⚠️ Security warning: localStorage keys and in-file fallback keys are sensitive credentials. Never commit real API keys, never share screenshots exposing keys, and avoid hardcoding keys for production deployments.
 
 ---
 
