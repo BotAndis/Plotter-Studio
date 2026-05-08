@@ -12,11 +12,11 @@ You describe a sketch in natural language, and it generates:
 
 The repository contains a no-build frontend app and an optional tiny Python proxy:
 
-- `/home/runner/work/Plotter-Studio/Plotter-Studio/plotter_studio.html`  
+- `plotter_studio.html`  
   Full version (pipeline mode, debug log, session management, token tracking)
-- `/home/runner/work/Plotter-Studio/Plotter-Studio/plotter_studio_artifact.html`  
+- `plotter_studio_artifact.html`  
   Artifact-focused version (optimized for hosted artifact usage)
-- `/home/runner/work/Plotter-Studio/Plotter-Studio/saia_proxy.py`  
+- `saia_proxy.py`  
   Local CORS proxy for Academic Cloud (SAIA)
 
 No build system is required: open the HTML file directly in a browser.
@@ -118,7 +118,7 @@ You can set keys through several paths:
    - `plotterStudio_corsProxy` (for SAIA proxy URL)
 
 4. **Legacy key migration path**  
-   Older key key `plotterStudio_apiKey` is migrated automatically to `plotterStudio_apiKey_anthropic`.
+   Older key `plotterStudio_apiKey` is migrated automatically to `plotterStudio_apiKey_anthropic`.
 
 5. **Code-level fallback path (Academic Cloud only)**  
    `ACADEMIC_CLOUD_KEY_DEFAULT` variable in both HTML files can provide a default SAIA key.
