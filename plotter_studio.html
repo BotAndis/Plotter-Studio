@@ -75,14 +75,14 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);font
 #inspiration-overlay.light-insp .insp-wow{background:rgba(192,104,32,.07)!important;border-color:var(--acc)!important}
 
 /* ── COLOR PICKER ── */
-#color-theme-pop{
+#color-theme-pop,#text-color-pop{
   position:fixed;z-index:9999;
   background:var(--surf);border:1px solid var(--brdhi);
   border-radius:8px;box-shadow:0 8px 28px rgba(0,0,0,.65);
   padding:14px;display:none;flex-direction:column;gap:10px;
   width:200px;
 }
-#color-theme-pop.open{display:flex}
+#color-theme-pop.open,#text-color-pop.open{display:flex}
 .ctp-label{font-size:7.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--txdim)}
 .ctp-swatches{display:flex;flex-wrap:wrap;gap:7px}
 .ctp-swatch{
@@ -324,16 +324,24 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);font
 #session-list{display:flex;flex-direction:column}
 .session-item{display:flex;align-items:center;gap:8px;padding:9px 12px;border-bottom:1px solid var(--brd);cursor:pointer;transition:background .14s}
 .session-item:hover{background:var(--surf2)}
+.session-item.selected{background:var(--accdim);border-left:2px solid var(--acc);padding-left:10px}
 .session-item-name{flex:1;font-size:10px;color:var(--txhi)}
 .session-item-date{font-size:8px;color:var(--txdim)}
+.session-item-load{height:20px;padding:0 7px;background:none;border:1px solid var(--brd);border-radius:3px;color:var(--txdim);font-family:var(--font);font-size:7px;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;transition:all .15s;flex-shrink:0}
+.session-item-load:hover{border-color:var(--acc);color:var(--acc)}
 .session-item-del{width:20px;height:20px;background:none;border:none;color:var(--txdim);cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;border-radius:3px;transition:all .15s;flex-shrink:0}
 .session-item-del:hover{color:var(--pink);background:rgba(200,72,112,.1)}
 .session-empty{padding:20px;font-size:9px;letter-spacing:.1em;color:var(--txdim);text-align:center;line-height:1.8}
-.sp2-foot{padding:10px;border-top:1px solid var(--brd);display:flex;gap:7px;flex-shrink:0}
+.sp2-foot{padding:10px;border-top:1px solid var(--brd);display:flex;flex-direction:column;gap:7px;flex-shrink:0}
+.sp2-row{display:flex;gap:7px;align-items:center}
 #session-name-input{flex:1;background:var(--bg);border:1px solid var(--brd);border-radius:3px;color:var(--txhi);font-family:var(--font);font-size:9.5px;padding:5px 8px;outline:none;transition:border-color .2s}
 #session-name-input:focus{border-color:var(--acc)}
 #session-save-btn{padding:0 10px;height:27px;background:var(--acc);color:#fff;border:none;border-radius:3px;font-family:var(--font);font-size:8px;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;white-space:nowrap}
 #session-save-btn:hover{background:var(--acchi)}
+#session-autosave-btn,#session-load-btn{padding:0 10px;height:27px;background:none;border:1px solid var(--brd);border-radius:3px;color:var(--txdim);font-family:var(--font);font-size:8px;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;white-space:nowrap;transition:all .16s}
+#session-autosave-btn:hover,#session-load-btn:hover:not(:disabled){border-color:var(--acc);color:var(--acc)}
+#session-autosave-btn.active{border-color:var(--grn);color:var(--grn);background:rgba(111,168,119,.08)}
+#session-load-btn:disabled{opacity:.45;cursor:not-allowed}
 
 /* ── RESET CONFIRM ── */
 #reset-confirm{
@@ -722,6 +730,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);font
   <div class="nav-spacer"></div>
   <div class="nav-right">
     <button id="color-theme-btn" class="theme-btn" title="Accent color">◈</button>
+    <button id="text-color-btn" class="theme-btn" title="Text color" aria-label="Change text color">A</button>
     <button id="theme-btn" class="theme-btn" title="Toggle light/dark theme">☾</button>
     <div class="bst"><span class="sd" id="sdot"></span><span id="slbl">idle</span></div>
   </div>
@@ -967,6 +976,9 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);font
   <div class="tpl-item active-tpl" data-tpl="dma" id="tpl-dma">
     <span class="tpl-dot"></span>dMA Creative Coding
   </div>
+  <div class="tpl-item" id="tpl-edit-dma-item">
+    <span class="tpl-dot"></span>Edit dMA Template…
+  </div>
   <div class="tpl-item" data-tpl="custom" id="tpl-custom-item">
     <span class="tpl-dot"></span>Custom…
   </div>
@@ -1016,7 +1028,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);font
 <div id="tpl-editor">
   <div id="tpl-editor-hdr">
     <span class="d">◆</span>
-    <span class="title">Custom Template</span>
+    <span class="title" id="tpl-editor-title">Template Editor</span>
     <button class="hbtn" id="tpl-editor-close">✕</button>
   </div>
   <div id="tpl-editor-body">
@@ -1313,8 +1325,12 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);font
     <div class="session-empty" id="session-empty">No saved sessions yet.<br>Save the current session below.</div>
   </div>
   <div class="sp2-foot">
-    <input id="session-name-input" type="text" placeholder="Session name…">
-    <button id="session-save-btn">Save Current</button>
+    <div class="sp2-row">
+      <input id="session-name-input" type="text" placeholder="Session name…">
+      <button id="session-save-btn">Save Current</button>
+      <button id="session-autosave-btn">Auto Save</button>
+    </div>
+    <button id="session-load-btn" disabled>Load Session</button>
   </div>
 </div>
 <div id="session-overlay"></div>
@@ -1347,6 +1363,21 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);font
   </div>
   <div class="ctp-custom">
     <input type="color" id="ctp-custom-input" value="#c06820" title="Custom color">
+    <span class="ctp-custom-label">Custom</span>
+  </div>
+</div>
+<div id="text-color-pop">
+  <div class="ctp-label">Text Color</div>
+  <div class="ctp-swatches">
+    <div class="ctp-swatch tcp-swatch active" data-txt="#555555" style="background:#555555" title="Default Dark"></div>
+    <div class="ctp-swatch tcp-swatch" data-txt="#aaaaaa" style="background:#aaaaaa" title="Soft Gray"></div>
+    <div class="ctp-swatch tcp-swatch" data-txt="#dddddd" style="background:#dddddd" title="Light Gray"></div>
+    <div class="ctp-swatch tcp-swatch" data-txt="#ffffff" style="background:#ffffff" title="White"></div>
+    <div class="ctp-swatch tcp-swatch" data-txt="#c8d6ff" style="background:#c8d6ff" title="Cool White"></div>
+    <div class="ctp-swatch tcp-swatch" data-txt="#ffd7a8" style="background:#ffd7a8" title="Warm White"></div>
+  </div>
+  <div class="ctp-custom">
+    <input type="color" id="tcp-custom-input" value="#555555" title="Custom text color">
     <span class="ctp-custom-label">Custom</span>
   </div>
 </div>
@@ -1395,6 +1426,7 @@ var stored = { title:'', desc:'', pdecode:'', p5code:'', pdeexp:'', p5exp:'' };
 var sessionTokens = { input: 0, output: 0, requests: 0 };
 var currentTemplate = 'dma'; // 'dma' | 'custom'
 var customTemplate  = { name:'Custom', body:'' };
+var editingTemplate = 'custom';
 
 function G(id){ return document.getElementById(id); }
 
@@ -1584,7 +1616,7 @@ MANDATORY OUTPUT FORMAT — always exactly these sections in this order, nothing
 Two or three sentences. What the viewer sees. Which generative system drives it. Why it works as a plotted drawing.`;
 
 // dMA template user prompt addition
-var DMA_PROMPT_ADDITION = `
+var DMA_PROMPT_DEFAULT = `
 Generate a sketch for Processing and p5.js:
 Screen: 1080, 764
 Background: White
@@ -1603,6 +1635,7 @@ Add text next to the start and end points showing the XY coordinates.
 Create a footer (16pt, same color) in the bottom right corner: "dMA Creative Coding - Lines_01" + date.
 Create a header at the top left corner counting the placed lines and showing the max lines.
 Save the lines in an array and redraw them for SVG export.`;
+var dmaTemplate = { name:'dMA Creative Coding', body:DMA_PROMPT_DEFAULT };
 
 // ── Build system prompt from settings ─────────────────────────
 function buildSysPrompt() {
@@ -2186,9 +2219,10 @@ function buildUserPrompt(task) {
   }
 
   // dMA template
+  var dmaBody = (dmaTemplate.body || '').trim() || DMA_PROMPT_DEFAULT;
   return 'Generate a plotter sketch:\n' +
     'Screen: 1080×764 | BG: White | Stroke: Black | Weight: 1 | FR: 12 | Date: ' + d + '\n' +
-    DMA_PROMPT_ADDITION + '\n\nTask: ' + task;
+    dmaBody + '\n\nTask: ' + task;
 }
 
 // ── Parse response ────────────────────────────────────────────
@@ -2614,40 +2648,148 @@ async function checkAvailableModels(provider) {
 
 // Session manager
 var SESSIONS_KEY = 'plotterStudio_sessions';
+var SESSION_AUTOSAVE_KEY = 'plotterStudio_sessionAutosaveEnabled';
+var MAX_SESSIONS = 20;
+var AUTOSAVE_INTERVAL_MS = 60000;
+var selectedSessionIndex = -1;
+var autosaveEnabled = false;
+var autosaveTimer = null;
 function loadSessions(){ try{return JSON.parse(localStorage.getItem(SESSIONS_KEY)||'[]');}catch(e){return[];} }
 function saveSessions(arr){ try{localStorage.setItem(SESSIONS_KEY,JSON.stringify(arr));}catch(e){} }
+function updateSessionLoadButton(){
+  var sessions = loadSessions();
+  G('session-load-btn').disabled = !(selectedSessionIndex >= 0 && selectedSessionIndex < sessions.length);
+}
+function setSelectedSessionIndex(idx){
+  selectedSessionIndex = idx;
+  renderSessionList();
+}
+function adjustSelectedIndexOnRemoval(removedIndex){
+  if(selectedSessionIndex===removedIndex) selectedSessionIndex=-1;
+  else if(selectedSessionIndex>removedIndex) selectedSessionIndex--;
+}
+function loadSessionByIndex(idx){
+  var sessions = loadSessions();
+  if(idx < 0){
+    addBubble('Please select a session to load.','claude');
+    return;
+  }
+  if(idx >= sessions.length){
+    addBubble('Selected session no longer exists. Please select again.','claude','err');
+    renderSessionList();
+    return;
+  }
+  var s = sessions[idx];
+  loadSession(s); closeSessionPanel();
+  addBubble('Session <strong>'+(s.name||'Untitled')+'</strong> loaded.','claude');
+}
+function buildSessionSnapshot(name){
+  return {
+    name:name,
+    ts:Date.now(),
+    chatHistory:chatHistory,
+    stored:stored,
+    model:MODEL,
+    settings:getSettings(),
+    currentTemplate:currentTemplate,
+    dmaTemplate:dmaTemplate,
+    customTemplate:customTemplate,
+    tokens:{ input:sessionTokens.input, output:sessionTokens.output, requests:sessionTokens.requests }
+  };
+}
+function updateAutoSaveButton(){
+  var btn = G('session-autosave-btn');
+  btn.classList.toggle('active', autosaveEnabled);
+  btn.textContent = autosaveEnabled ? 'Auto Save On' : 'Auto Save';
+}
+function persistAutosaveFlag(){
+  try{localStorage.setItem(SESSION_AUTOSAVE_KEY, autosaveEnabled ? '1' : '0');}catch(e){}
+}
+function autoSaveCurrentSession(silent){
+  var sessions=loadSessions();
+  var sessionData = buildSessionSnapshot('Auto Save');
+  sessionData.isAutosave = true;
+  var existingIndex = sessions.findIndex(function(s){ return s.isAutosave; });
+  if(existingIndex >= 0) sessions[existingIndex] = sessionData;
+  else sessions.push(sessionData);
+  if(sessions.length>MAX_SESSIONS){
+    while(sessions.length>MAX_SESSIONS){
+      var removable = sessions.findIndex(function(s){ return !s.isAutosave; });
+      if(removable === -1) break;
+      sessions.splice(removable,1);
+      adjustSelectedIndexOnRemoval(removable);
+    }
+    while(sessions.length>MAX_SESSIONS){
+      sessions.shift();
+      adjustSelectedIndexOnRemoval(0);
+    }
+  }
+  saveSessions(sessions);
+  if(!silent) addBubble('Auto-save snapshot updated.','claude');
+  renderSessionList();
+}
+function startAutosaveTimer(){
+  if(autosaveTimer) clearInterval(autosaveTimer);
+  if(!autosaveEnabled) return;
+  autosaveTimer = setInterval(function(){ autoSaveCurrentSession(true); }, AUTOSAVE_INTERVAL_MS);
+}
+function toggleAutosave(){
+  autosaveEnabled = !autosaveEnabled;
+  updateAutoSaveButton();
+  persistAutosaveFlag();
+  startAutosaveTimer();
+  if(autosaveEnabled){
+    autoSaveCurrentSession(true);
+    addBubble('Auto Save enabled. A snapshot updates every minute.','claude');
+  }else{
+    addBubble('Auto Save disabled.','claude');
+  }
+}
 function renderSessionList(){
   var sessions=loadSessions(), list=G('session-list'), empty=G('session-empty');
+  if(selectedSessionIndex >= sessions.length) selectedSessionIndex = -1;
   list.innerHTML='';
-  if(!sessions.length){empty.style.display='block';return;}
+  if(!sessions.length){empty.style.display='block'; selectedSessionIndex = -1; updateSessionLoadButton(); return;}
   empty.style.display='none';
   sessions.slice().reverse().forEach(function(s,ri){
     var idx=sessions.length-1-ri;
     var item=document.createElement('div'); item.className='session-item';
+    if(idx===selectedSessionIndex) item.classList.add('selected');
     var d=new Date(s.ts);
     var ds=d.toLocaleDateString('de-DE')+' '+d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
-    item.innerHTML='<span class=session-item-name>'+(s.name||'Untitled')+'</span>'+
+    var name = s.name || 'Untitled';
+    if(s.isAutosave) name += ' (Auto)';
+    item.innerHTML='<span class=session-item-name>'+name+'</span>'+
       '<span class=session-item-date>'+ds+'</span>'+
+      '<button class=session-item-load title=Load>Load</button>'+
       '<button class=session-item-del title=Delete>×</button>';
+    item.querySelector('.session-item-load').addEventListener('click',function(e){
+      e.stopPropagation();
+      loadSessionByIndex(idx);
+    });
     item.querySelector('.session-item-del').addEventListener('click',function(e){
-      e.stopPropagation(); var arr=loadSessions(); arr.splice(idx,1); saveSessions(arr); renderSessionList();
+      e.stopPropagation();
+      var arr = loadSessions();
+      arr.splice(idx,1);
+      adjustSelectedIndexOnRemoval(idx);
+      saveSessions(arr);
+      renderSessionList();
     });
     item.addEventListener('click',function(){
-      loadSession(s); closeSessionPanel();
-      addBubble('Session <strong>'+(s.name||'Untitled')+'</strong> loaded.','claude');
+      setSelectedSessionIndex(idx);
     });
     list.appendChild(item);
   });
+  updateSessionLoadButton();
 }
 function saveCurrentSession(){
   var name=G('session-name-input').value.trim()||('Session '+new Date().toLocaleDateString('de-DE'));
   var sessions=loadSessions();
-  var sessionData={name:name,ts:Date.now(),chatHistory:chatHistory,stored:stored,
-    model:MODEL,settings:getSettings(),currentTemplate:currentTemplate,customTemplate:customTemplate,
-    tokens:{ input:sessionTokens.input, output:sessionTokens.output, requests:sessionTokens.requests }};
+  var sessionData=buildSessionSnapshot(name);
   sessions.push(sessionData);
-  if(sessions.length>20) sessions=sessions.slice(-20);
+  if(sessions.length>MAX_SESSIONS) sessions=sessions.slice(-MAX_SESSIONS);
   saveSessions(sessions); G('session-name-input').value='';
+  selectedSessionIndex=sessions.length-1;
   renderSessionList();
   // Also download as .txt file
   var lines = [];
@@ -2692,6 +2834,12 @@ function loadSession(s){
   else sessionTokens={input:0,output:0,requests:0};
   if(s.model){MODEL=s.model; var lbl=MODEL_LABELS[s.model]||s.model; G('model-btn-label').textContent=lbl; G('cl-sub-model').textContent=lbl;}
   if(s.settings) applySettings(s.settings);
+  if(s.dmaTemplate && typeof s.dmaTemplate === 'object'){
+    dmaTemplate = {
+      name: 'dMA Creative Coding',
+      body: typeof s.dmaTemplate.body === 'string' ? s.dmaTemplate.body : DMA_PROMPT_DEFAULT
+    };
+  }
   if(s.customTemplate) customTemplate=s.customTemplate;
   if(s.currentTemplate) setActiveTpl(s.currentTemplate);
   restorePanels(); updateThinkingBar();
@@ -2702,13 +2850,18 @@ G('session-btn').addEventListener('click',function(e){e.stopPropagation();openSe
 G('session-close').addEventListener('click',closeSessionPanel);
 G('session-overlay').addEventListener('click',closeSessionPanel);
 G('session-save-btn').addEventListener('click',saveCurrentSession);
+G('session-autosave-btn').addEventListener('click',toggleAutosave);
+G('session-load-btn').addEventListener('click',function(){ loadSessionByIndex(selectedSessionIndex); });
+try{ autosaveEnabled = localStorage.getItem(SESSION_AUTOSAVE_KEY)==='1'; }catch(e){ autosaveEnabled=false; }
+updateAutoSaveButton();
+startAutosaveTimer();
 
 // Reset
 G('reset-btn').addEventListener('click',function(){G('reset-confirm').classList.add('open');});
 G('rc-cancel').addEventListener('click',function(){G('reset-confirm').classList.remove('open');});
 G('rc-ok').addEventListener('click',function(){
   try{[PREFS_KEY,'plotterStudio_theme','plotterStudio_apiKey',
-    'plotterStudio_apiKey_anthropic','plotterStudio_apiKey_gemini',SESSIONS_KEY].forEach(function(k){localStorage.removeItem(k);});}catch(e){}
+    'plotterStudio_apiKey_anthropic','plotterStudio_apiKey_gemini','plotterStudio_textColor',SESSIONS_KEY,SESSION_AUTOSAVE_KEY].forEach(function(k){localStorage.removeItem(k);});}catch(e){}
   G('reset-confirm').classList.remove('open'); location.reload();
 });
 
@@ -2719,7 +2872,7 @@ function setActiveTpl(tpl) {
   currentTemplate = tpl;
   G('tpl-dma').classList.toggle('active-tpl', tpl === 'dma');
   G('tpl-custom-item').classList.toggle('active-tpl', tpl === 'custom');
-  var label = tpl === 'custom' ? (customTemplate.name || 'Custom') : 'dMA Creative Coding';
+  var label = tpl === 'custom' ? (customTemplate.name || 'Custom') : (dmaTemplate.name || 'dMA Creative Coding');
   G('tpl-btn').innerHTML = '⊞ ' + label + ' ▾';
   saveState();
 }
@@ -2759,13 +2912,30 @@ G('tpl-custom-item').addEventListener('click', function() {
   tplOpen = false;
   G('tpl-drop').classList.remove('open');
   G('tpl-btn').classList.remove('active');
-  openTemplateEditor();
+  openTemplateEditor('custom');
+});
+
+G('tpl-edit-dma-item').addEventListener('click', function() {
+  tplOpen = false;
+  G('tpl-drop').classList.remove('open');
+  G('tpl-btn').classList.remove('active');
+  openTemplateEditor('dma');
 });
 
 // Template editor
-function openTemplateEditor() {
-  G('tpl-name-input').value = customTemplate.name || '';
-  G('tpl-textarea').value   = customTemplate.body || '';
+function openTemplateEditor(which) {
+  editingTemplate = (which === 'dma' || which === 'custom') ? which : 'custom';
+  if(editingTemplate === 'dma'){
+    G('tpl-editor-title').textContent = 'dMA Template';
+    G('tpl-name-input').value = dmaTemplate.name || 'dMA Creative Coding';
+    G('tpl-name-input').disabled = true;
+    G('tpl-textarea').value   = dmaTemplate.body || DMA_PROMPT_DEFAULT;
+  } else {
+    G('tpl-editor-title').textContent = 'Custom Template';
+    G('tpl-name-input').value = customTemplate.name || '';
+    G('tpl-name-input').disabled = false;
+    G('tpl-textarea').value   = customTemplate.body || '';
+  }
   G('tpl-editor').classList.add('open');
   G('tpl-editor-overlay').classList.add('open');
 }
@@ -2775,12 +2945,18 @@ function closeTemplateEditor() {
 }
 
 G('tpl-save-btn').addEventListener('click', function() {
-  var name = G('tpl-name-input').value.trim() || 'Custom';
   var body = G('tpl-textarea').value.trim();
-  customTemplate = { name: name, body: body };
-  setActiveTpl('custom');
+  if(editingTemplate === 'dma'){
+    dmaTemplate = { name:'dMA Creative Coding', body: body || DMA_PROMPT_DEFAULT };
+    setActiveTpl('dma');
+    addBubble('Template <strong>dMA Creative Coding</strong> saved and active.', 'claude');
+  } else {
+    var name = G('tpl-name-input').value.trim() || 'Custom';
+    customTemplate = { name: name, body: body };
+    setActiveTpl('custom');
+    addBubble('Template <strong>' + name + '</strong> saved and active.', 'claude');
+  }
   closeTemplateEditor();
-  addBubble('Template <strong>' + name + '</strong> saved and active.', 'claude');
   saveState();
 });
 G('tpl-cancel-btn').addEventListener('click', closeTemplateEditor);
@@ -2856,7 +3032,12 @@ makeVSplit('vh-ch',G('code-panel'),G('how-panel'));
 
 // ── Fullscreen ────────────────────────────────────────────────
 G('fsbtn').addEventListener('click',function(){G('fs-overlay').classList.add('on');if(lastFnP5)runP5_FS(lastFnP5);});
-G('fs-close').addEventListener('click',function(){G('fs-overlay').classList.remove('on');if(p5instFS){p5instFS.remove();p5instFS=null;}G('fs-p5w').innerHTML='';});
+function closeFullscreenOverlay(){
+  G('fs-overlay').classList.remove('on');
+  if(p5instFS){p5instFS.remove();p5instFS=null;}
+  G('fs-p5w').innerHTML='';
+}
+G('fs-close').addEventListener('click',closeFullscreenOverlay);
 G('fs-reseed').addEventListener('click',function(){if(lastFnP5)runP5_FS(lastFnP5,Math.floor(Math.random()*999999));});
 G('fs-dl-png').addEventListener('click',function(){downloadPNG(document.querySelector('#fs-p5w canvas'),'plotter_'+slugFromTitle()+'_preview.png');});
 function runP5_FS(fnStr,seed){
@@ -2890,7 +3071,7 @@ function showHowto(mode){
 }
 
 // ── localStorage ──────────────────────────────────────────────
-// NO auto-save: refresh = clean slate. Only explicit session save persists data.
+// Session data is not persisted by default. Session panel offers manual save and optional auto-save.
 // Settings (checkboxes, model, template, accent) are saved independently so they survive refresh.
 var PREFS_KEY = 'plotterStudio_prefs';
 
@@ -2901,6 +3082,7 @@ function saveState(){
       settings: getSettings(),
       model: MODEL,
       currentTemplate: currentTemplate,
+      dmaTemplate: dmaTemplate,
       customTemplate: customTemplate
     }));
   }catch(e){console.warn('prefs save failed',e);}
@@ -2922,6 +3104,13 @@ function loadState(){
       document.querySelectorAll('.md-item').forEach(function(el){
         el.classList.toggle('active-model', el.dataset.model === s.model);
       });
+    }
+
+    if(s.dmaTemplate && typeof s.dmaTemplate === 'object'){
+      dmaTemplate = {
+        name: 'dMA Creative Coding',
+        body: typeof s.dmaTemplate.body === 'string' ? s.dmaTemplate.body : DMA_PROMPT_DEFAULT
+      };
     }
 
     if(s.customTemplate && typeof s.customTemplate === 'object'){
@@ -3197,8 +3386,47 @@ G('cin').addEventListener('keydown',function(e){if((e.ctrlKey||e.metaKey)&&e.key
 G('dbg-toggle').addEventListener('click',function(e){e.stopPropagation();G('dbg-overlay').classList.toggle('open');});
 G('dbg-close').addEventListener('click',function(e){e.stopPropagation();G('dbg-overlay').classList.remove('open');});
 G('dbg-overlay').addEventListener('click',function(e){if(e.target===this)this.classList.remove('open');});
-// Escape key closes debug overlay
-document.addEventListener('keydown',function(e){if(e.key==='Escape'&&G('dbg-overlay').classList.contains('open')){G('dbg-overlay').classList.remove('open');}});
+function closeOpenMenusAndOverlays(){
+  var closed = false;
+  if(G('inspiration-overlay').classList.contains('open')){
+    switchNav('studio');
+    closed = true;
+  }
+  if(G('dbg-overlay').classList.contains('open')){ G('dbg-overlay').classList.remove('open'); closed = true; }
+  if(G('fs-overlay').classList.contains('on')){ closeFullscreenOverlay(); closed = true; }
+  if(G('session-panel').classList.contains('open')){ closeSessionPanel(); closed = true; }
+  if(settingsOpen){
+    settingsOpen=false;
+    G('settings-pop').classList.remove('open');
+    G('settings-btn').classList.remove('active');
+    saveState();
+    closed = true;
+  }
+  if(modelDropOpen){ closeModelDrop(); closed = true; }
+  if(tplOpen){
+    tplOpen = false;
+    G('tpl-drop').classList.remove('open');
+    G('tpl-btn').classList.remove('active');
+    closed = true;
+  }
+  if(G('tpl-editor').classList.contains('open')){ closeTemplateEditor(); closed = true; }
+  if(colorPopOpen){
+    colorPopOpen = false;
+    G('color-theme-pop').classList.remove('open');
+    closed = true;
+  }
+  if(textColorPopOpen){
+    textColorPopOpen = false;
+    G('text-color-pop').classList.remove('open');
+    closed = true;
+  }
+  if(G('reset-confirm').classList.contains('open')){ G('reset-confirm').classList.remove('open'); closed = true; }
+  if(G('about-overlay').classList.contains('open')){ G('about-overlay').classList.remove('open'); closed = true; }
+  return closed;
+}
+document.addEventListener('keydown',function(e){
+  if(e.key==='Escape' && closeOpenMenusAndOverlays()) e.preventDefault();
+});
 
 // ── Export: Chat History ──
 G('export-history-btn').addEventListener('click',function(){
@@ -3548,6 +3776,8 @@ G('ctp-custom-input').addEventListener('input', function(){
 var colorPopOpen = false;
 G('color-theme-btn').addEventListener('click', function(e){
   e.stopPropagation();
+  textColorPopOpen = false;
+  G('text-color-pop').classList.remove('open');
   colorPopOpen = !colorPopOpen;
   var pop = G('color-theme-pop');
   pop.classList.toggle('open', colorPopOpen);
@@ -3571,6 +3801,58 @@ try {
     var a = JSON.parse(savedAccent);
     applyAccent(a.acc, a.achi, a.accdim);
     G('ctp-custom-input').value = a.acc;
+  }
+} catch(e) {}
+
+// Text color popup + application
+var textColorPopOpen = false;
+function isValidHexColor(value){
+  return typeof value === 'string' && /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(value);
+}
+function applyMutedTextColor(txtColor){
+  if(!isValidHexColor(txtColor)) return;
+  var txtColorLower = txtColor.toLowerCase();
+  document.body.style.setProperty('--txdim', txtColor);
+  document.body.style.setProperty('--txlo', txtColor);
+  document.querySelectorAll('.tcp-swatch').forEach(function(s){
+    s.classList.toggle('active', s.dataset.txt.toLowerCase() === txtColorLower);
+  });
+  try { localStorage.setItem('plotterStudio_textColor', txtColor); } catch(e){}
+}
+document.querySelectorAll('.tcp-swatch').forEach(function(s){
+  s.addEventListener('click', function(){
+    applyMutedTextColor(s.dataset.txt);
+    G('tcp-custom-input').value = s.dataset.txt;
+  });
+});
+G('text-color-btn').addEventListener('click', function(e){
+  e.stopPropagation();
+  colorPopOpen = false;
+  G('color-theme-pop').classList.remove('open');
+  textColorPopOpen = !textColorPopOpen;
+  var pop = G('text-color-pop');
+  pop.classList.toggle('open', textColorPopOpen);
+  if (textColorPopOpen) {
+    var br = G('text-color-btn').getBoundingClientRect();
+    pop.style.right = (window.innerWidth - br.right) + 'px';
+    pop.style.top   = (br.bottom + 6) + 'px';
+    pop.style.left  = 'auto';
+  }
+});
+G('tcp-custom-input').addEventListener('input', function(){
+  applyMutedTextColor(this.value);
+});
+document.addEventListener('click', function(e){
+  if (textColorPopOpen && !G('text-color-pop').contains(e.target)){
+    textColorPopOpen = false;
+    G('text-color-pop').classList.remove('open');
+  }
+});
+try {
+  var savedTextColor = localStorage.getItem('plotterStudio_textColor');
+  if (savedTextColor) {
+    applyMutedTextColor(savedTextColor);
+    G('tcp-custom-input').value = savedTextColor;
   }
 } catch(e) {}
 
