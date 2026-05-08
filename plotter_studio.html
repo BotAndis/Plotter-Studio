@@ -2627,6 +2627,8 @@ async function checkAvailableModels(provider) {
 // Session manager
 var SESSIONS_KEY = 'plotterStudio_sessions';
 var SESSION_AUTOSAVE_KEY = 'plotterStudio_sessionAutosaveEnabled';
+var MAX_SESSIONS = 20;
+var AUTOSAVE_INTERVAL_MS = 60000;
 var selectedSessionIndex = -1;
 var autosaveEnabled = false;
 var autosaveTimer = null;
@@ -2639,6 +2641,10 @@ function updateSessionLoadButton(){
 function setSelectedSessionIndex(idx){
   selectedSessionIndex = idx;
   renderSessionList();
+}
+function adjustSelectedIndexOnRemoval(removedIndex){
+  if(selectedSessionIndex===removedIndex) selectedSessionIndex=-1;
+  else if(selectedSessionIndex>removedIndex) selectedSessionIndex--;
 }
 function loadSessionByIndex(idx){
   var sessions = loadSessions();
@@ -2678,15 +2684,14 @@ function autoSaveCurrentSession(silent){
   var existingIndex = sessions.findIndex(function(s){ return !!s.isAutosave; });
   if(existingIndex >= 0) sessions[existingIndex] = sessionData;
   else sessions.push(sessionData);
-  if(sessions.length>20){
-    while(sessions.length>20){
+  if(sessions.length>MAX_SESSIONS){
+    while(sessions.length>MAX_SESSIONS){
       var removable = sessions.findIndex(function(s){ return !s.isAutosave; });
       if(removable === -1) break;
       sessions.splice(removable,1);
-      if(selectedSessionIndex > removable) selectedSessionIndex--;
-      if(selectedSessionIndex === removable) selectedSessionIndex = -1;
+      adjustSelectedIndexOnRemoval(removable);
     }
-    if(sessions.length>20) sessions=sessions.slice(-20);
+    if(sessions.length>MAX_SESSIONS) sessions=sessions.slice(-MAX_SESSIONS);
   }
   saveSessions(sessions);
   if(!silent) addBubble('Auto-save snapshot updated.','claude');
@@ -2695,7 +2700,7 @@ function autoSaveCurrentSession(silent){
 function startAutosaveTimer(){
   if(autosaveTimer) clearInterval(autosaveTimer);
   if(!autosaveEnabled) return;
-  autosaveTimer = setInterval(function(){ autoSaveCurrentSession(true); }, 60000);
+  autosaveTimer = setInterval(function(){ autoSaveCurrentSession(true); }, AUTOSAVE_INTERVAL_MS);
 }
 function toggleAutosave(){
   autosaveEnabled = !autosaveEnabled;
@@ -2723,7 +2728,7 @@ function renderSessionList(){
     var ds=d.toLocaleDateString('de-DE')+' '+d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
     var name = s.name || 'Untitled';
     if(s.isAutosave) name += ' (Auto)';
-    item.innerHTML='<span class=session-item-name>'+(s.name||'Untitled')+'</span>'+
+    item.innerHTML='<span class=session-item-name>'+name+'</span>'+
       '<span class=session-item-date>'+ds+'</span>'+
       '<button class=session-item-load title=Load>Load</button>'+
       '<button class=session-item-del title=Delete>×</button>';
@@ -2734,8 +2739,7 @@ function renderSessionList(){
     item.querySelector('.session-item-del').addEventListener('click',function(e){
       e.stopPropagation();
       sessions.splice(idx,1);
-      if(selectedSessionIndex===idx) selectedSessionIndex=-1;
-      else if(selectedSessionIndex>idx) selectedSessionIndex--;
+      adjustSelectedIndexOnRemoval(idx);
       saveSessions(sessions);
       renderSessionList();
     });
@@ -2745,7 +2749,6 @@ function renderSessionList(){
     item.addEventListener('dblclick',function(){
       loadSessionByIndex(idx);
     });
-    item.querySelector('.session-item-name').textContent = name;
     list.appendChild(item);
   });
   updateSessionLoadButton();
@@ -2755,7 +2758,7 @@ function saveCurrentSession(){
   var sessions=loadSessions();
   var sessionData=buildSessionSnapshot(name);
   sessions.push(sessionData);
-  if(sessions.length>20) sessions=sessions.slice(-20);
+  if(sessions.length>MAX_SESSIONS) sessions=sessions.slice(-MAX_SESSIONS);
   saveSessions(sessions); G('session-name-input').value='';
   selectedSessionIndex=sessions.length-1;
   renderSessionList();
