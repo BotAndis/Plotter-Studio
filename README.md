@@ -19,7 +19,7 @@ This is the flexible option. You open the HTML file locally in your browser and 
 Supported providers include:
 
 - Anthropic
-- Google Gemini
+- Google Gemini [How to get a Gemini API key](docs/gemini-api-key.md)
 - Academic Cloud SAIA
 
 This is the best option if you want control over model choice, local edits, custom prompts, proxy settings, or future modifications. Gemini supports API-key-based integration through Google AI Studio, and Anthropic supports its Messages API for direct app integration.
