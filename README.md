@@ -22,7 +22,7 @@ Supported providers include:
 - Google Gemini
 - Academic Cloud SAIA
 
-This is the best option if you want control over model choice, local edits, custom prompts, proxy settings, or future modifications. Gemini supports API-key-based integration through Google AI Studio, and Anthropic supports its Messages API for direct app integration. [web:122][web:2]
+This is the best option if you want control over model choice, local edits, custom prompts, proxy settings, or future modifications. Gemini supports API-key-based integration through Google AI Studio, and Anthropic supports its Messages API for direct app integration.
 
 ---
 
@@ -118,11 +118,11 @@ Anthropic requests use the Messages API at:
 https://api.anthropic.com/v1/messages
 ```
 
-Anthropic documents the Messages API as the main multi-turn interface for Claude model calls. [web:2]
+Anthropic documents the Messages API as the main multi-turn interface for Claude model calls.
 
 ### Gemini
 
-Gemini requests use Google's `generateContent` API pattern. Google documents API key usage through Google AI Studio and explicit key-based authentication for Gemini API requests. [web:117][web:122]
+Gemini requests use Google's `generateContent` API pattern. Google documents API key usage through Google AI Studio and explicit key-based authentication for Gemini API requests.
 
 ### Academic Cloud SAIA
 
@@ -211,8 +211,7 @@ Typical request body includes:
 - `max_tokens`
 - optional `thinking`
 
-Anthropic’s Messages API is the documented structure for Claude conversations. [web:2]
-
+Anthropic’s Messages API is the documented structure for Claude conversations.
 #### Gemini
 
 Endpoint pattern:
@@ -231,7 +230,7 @@ Typical request body includes:
 - `systemInstruction`
 - `generationConfig`
 
-Google documents Gemini API key management in Google AI Studio and explicit key-based integration patterns. [web:122][web:117]
+Google documents Gemini API key management in Google AI Studio and explicit key-based integration patterns.
 
 #### Academic Cloud SAIA
 
@@ -478,7 +477,7 @@ This system is visual only and does not affect provider calls or code generation
 - one prompt = one fresh generation
 - no persistent state between runs
 
-Claude artifacts appear in a dedicated window to the right of the main chat, which is why the artifact version feels different from the standalone local browser experience. [web:18][web:162]
+Claude artifacts appear in a dedicated window to the right of the main chat, which is why the artifact version feels different from the standalone local browser experience.
 
 ---
 
@@ -490,8 +489,7 @@ Claude artifacts appear in a dedicated window to the right of the main chat, whi
 - prefer server-side secret handling for public production deployments
 - browser-direct key usage is fine for local testing, but less safe than a backend proxy
 
-Google explicitly documents API-key-based Gemini integration, while also noting that hardcoding keys should only be temporary. [web:122]  
-For production, move secrets out of the browser whenever possible. [web:122][web:146]
+Google explicitly documents API-key-based Gemini integration, while also noting that hardcoding keys should only be temporary.
 
 ---
 
