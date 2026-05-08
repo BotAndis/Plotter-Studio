@@ -75,14 +75,14 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);font
 #inspiration-overlay.light-insp .insp-wow{background:rgba(192,104,32,.07)!important;border-color:var(--acc)!important}
 
 /* ── COLOR PICKER ── */
-#color-theme-pop{
+#color-theme-pop,#text-color-pop{
   position:fixed;z-index:9999;
   background:var(--surf);border:1px solid var(--brdhi);
   border-radius:8px;box-shadow:0 8px 28px rgba(0,0,0,.65);
   padding:14px;display:none;flex-direction:column;gap:10px;
   width:200px;
 }
-#color-theme-pop.open{display:flex}
+#color-theme-pop.open,#text-color-pop.open{display:flex}
 .ctp-label{font-size:7.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--txdim)}
 .ctp-swatches{display:flex;flex-wrap:wrap;gap:7px}
 .ctp-swatch{
@@ -722,6 +722,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);font
   <div class="nav-spacer"></div>
   <div class="nav-right">
     <button id="color-theme-btn" class="theme-btn" title="Accent color">◈</button>
+    <button id="text-color-btn" class="theme-btn" aria-label="Change text color">A</button>
     <button id="theme-btn" class="theme-btn" title="Toggle light/dark theme">☾</button>
     <div class="bst"><span class="sd" id="sdot"></span><span id="slbl">idle</span></div>
   </div>
@@ -1316,6 +1317,21 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);font
   </div>
   <div class="ctp-custom">
     <input type="color" id="ctp-custom-input" value="#c06820" title="Custom color">
+    <span class="ctp-custom-label">Custom</span>
+  </div>
+</div>
+<div id="text-color-pop">
+  <div class="ctp-label">Text Color</div>
+  <div class="ctp-swatches">
+    <div class="ctp-swatch tcp-swatch active" data-txt="#555555" style="background:#555555" title="Default Dark"></div>
+    <div class="ctp-swatch tcp-swatch" data-txt="#aaaaaa" style="background:#aaaaaa" title="Soft Gray"></div>
+    <div class="ctp-swatch tcp-swatch" data-txt="#dddddd" style="background:#dddddd" title="Light Gray"></div>
+    <div class="ctp-swatch tcp-swatch" data-txt="#ffffff" style="background:#ffffff" title="White"></div>
+    <div class="ctp-swatch tcp-swatch" data-txt="#c8d6ff" style="background:#c8d6ff" title="Cool White"></div>
+    <div class="ctp-swatch tcp-swatch" data-txt="#ffd7a8" style="background:#ffd7a8" title="Warm White"></div>
+  </div>
+  <div class="ctp-custom">
+    <input type="color" id="tcp-custom-input" value="#555555" title="Custom text color">
     <span class="ctp-custom-label">Custom</span>
   </div>
 </div>
@@ -2163,7 +2179,7 @@ G('reset-btn').addEventListener('click',function(){G('reset-confirm').classList.
 G('rc-cancel').addEventListener('click',function(){G('reset-confirm').classList.remove('open');});
 G('rc-ok').addEventListener('click',function(){
   try{[PREFS_KEY,'plotterStudio_theme','plotterStudio_apiKey',
-    'plotterStudio_apiKey_anthropic','plotterStudio_apiKey_gemini'].forEach(function(k){localStorage.removeItem(k);});}catch(e){}
+    'plotterStudio_apiKey_anthropic','plotterStudio_apiKey_gemini','plotterStudio_textColor'].forEach(function(k){localStorage.removeItem(k);});}catch(e){}
   G('reset-confirm').classList.remove('open'); location.reload();
 });
 
@@ -2917,8 +2933,11 @@ G('ctp-custom-input').addEventListener('input', function(){
 
 // Color theme popup
 var colorPopOpen = false;
+var textColorPopOpen = false;
 G('color-theme-btn').addEventListener('click', function(e){
   e.stopPropagation();
+  textColorPopOpen = false;
+  G('text-color-pop').classList.remove('open');
   colorPopOpen = !colorPopOpen;
   var pop = G('color-theme-pop');
   pop.classList.toggle('open', colorPopOpen);
@@ -2934,6 +2953,10 @@ document.addEventListener('click', function(e){
     colorPopOpen = false;
     G('color-theme-pop').classList.remove('open');
   }
+  if (textColorPopOpen && !G('text-color-pop').contains(e.target)){
+    textColorPopOpen = false;
+    G('text-color-pop').classList.remove('open');
+  }
 });
 // Load saved accent
 try {
@@ -2942,6 +2965,50 @@ try {
     var a = JSON.parse(savedAccent);
     applyAccent(a.acc, a.achi, a.accdim);
     G('ctp-custom-input').value = a.acc;
+  }
+} catch(e) {}
+
+function isValidHexColor(value){
+  return typeof value === 'string' && /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(value);
+}
+function applyMutedTextColor(txtColor){
+  if(!isValidHexColor(txtColor)) return;
+  var txtColorLower = txtColor.toLowerCase();
+  document.body.style.setProperty('--txdim', txtColor);
+  document.body.style.setProperty('--txlo', txtColor);
+  document.querySelectorAll('.tcp-swatch').forEach(function(s){
+    s.classList.toggle('active', s.dataset.txt.toLowerCase() === txtColorLower);
+  });
+  try { localStorage.setItem('plotterStudio_textColor', txtColor); } catch(e){}
+}
+document.querySelectorAll('.tcp-swatch').forEach(function(s){
+  s.addEventListener('click', function(){
+    applyMutedTextColor(s.dataset.txt);
+    G('tcp-custom-input').value = s.dataset.txt;
+  });
+});
+G('text-color-btn').addEventListener('click', function(e){
+  e.stopPropagation();
+  colorPopOpen = false;
+  G('color-theme-pop').classList.remove('open');
+  textColorPopOpen = !textColorPopOpen;
+  var pop = G('text-color-pop');
+  pop.classList.toggle('open', textColorPopOpen);
+  if (textColorPopOpen) {
+    var br = G('text-color-btn').getBoundingClientRect();
+    pop.style.right = (window.innerWidth - br.right) + 'px';
+    pop.style.top   = (br.bottom + 6) + 'px';
+    pop.style.left  = 'auto';
+  }
+});
+G('tcp-custom-input').addEventListener('input', function(){
+  applyMutedTextColor(this.value);
+});
+try {
+  var savedTextColor = localStorage.getItem('plotterStudio_textColor');
+  if (savedTextColor) {
+    applyMutedTextColor(savedTextColor);
+    G('tcp-custom-input').value = savedTextColor;
   }
 } catch(e) {}
 
