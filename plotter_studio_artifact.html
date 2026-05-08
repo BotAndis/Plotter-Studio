@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Generative Plotter Studio</title>
+<title>Generative Plotter Studio — Artifact Edition</title>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,300;0,400;0,500;0,600;1,300&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
 <style>
@@ -908,7 +908,6 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);font
     <div class="tb-divider"></div>
     <button id="tpl-btn">⊞ Template ▾</button>
     <div class="tb-divider"></div>
-    <button id="session-btn" class="tb-icon-btn" title="Sessions">🗂</button>
     <button id="reset-btn" class="tb-icon-btn tb-icon-danger" title="Reset all data">⟳</button>
   </div>
 
@@ -992,18 +991,6 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);font
     <label class="sp-row"><input type="checkbox" class="sp-cb" id="opt-reseed-btn" checked><span class="sp-label">Reseed Button</span></label>
     <label class="sp-row"><input type="checkbox" class="sp-cb" id="opt-sliders"><span class="sp-label">Allow Parameter Sliders</span></label>
 
-    <div class="sp-section">Pipeline</div>
-    <label class="sp-row"><input type="checkbox" class="sp-cb" id="opt-pipeline" checked><span class="sp-label">Multi-phase generation</span></label>
-    <div class="sp-hint">Splits generation into focused phases (concept → preview → code → explanations) for better quality and lower per-request token usage.</div>
-    <label class="sp-row"><input type="checkbox" class="sp-cb" id="opt-autofix" checked><span class="sp-label">Auto-fix preview errors</span></label>
-    <div class="sp-hint">When the p5.js preview has runtime errors, automatically sends a follow-up request to fix the code.</div>
-
-  </div>
-    <div class="sp-section">Export</div>
-    <div style="display:flex;gap:6px;padding:0 14px 8px">
-      <button class="dl-btn" id="export-history-btn" style="flex:1;font-size:8px;padding:4px 8px">📋 Chat History</button>
-      <button class="dl-btn" id="export-debug-btn" style="flex:1;font-size:8px;padding:4px 8px">⚙ Debug Log</button>
-    </div>
 
   </div>
   <div class="sp-foot">Unchecked sections are skipped. Saved automatically.</div>
@@ -1301,24 +1288,6 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);font
   <div id="md-tooltip"></div>
 </div>
 
-<!-- Session panel -->
-<div id="session-panel">
-  <div class="sp2-hdr">
-    <span style="color:var(--acc);font-size:9px">◆</span>
-    <span class="sp2-title">Sessions</span>
-    <button class="hbtn" id="session-close">✕</button>
-  </div>
-  <div id="session-list-wrap">
-    <div id="session-list"></div>
-    <div class="session-empty" id="session-empty">No saved sessions yet.<br>Save the current session below.</div>
-  </div>
-  <div class="sp2-foot">
-    <input id="session-name-input" type="text" placeholder="Session name…">
-    <button id="session-save-btn">Save Current</button>
-  </div>
-</div>
-<div id="session-overlay"></div>
-
 <!-- Reset confirm dialog -->
 <div id="reset-confirm">
   <div class="rc-body">
@@ -1360,15 +1329,6 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);font
   <div id="veil-detail"></div>
 
 </div>
-<button id="dbg-toggle" title="Toggle debug log">⚙</button>
-<!-- Debug log overlay -->
-<div id="dbg-overlay">
-  <div id="dbg-header">
-    <span>API Debug Log</span>
-    <button id="dbg-close">✕</button>
-  </div>
-  <div id="dbg-log"></div>
-</div>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
@@ -1392,7 +1352,6 @@ var p5instFS = null;
 var currentTab = 'pde';
 var pendingFiles = [];
 var stored = { title:'', desc:'', pdecode:'', p5code:'', pdeexp:'', p5exp:'' };
-var sessionTokens = { input: 0, output: 0, requests: 0 };
 var currentTemplate = 'dma'; // 'dma' | 'custom'
 var customTemplate  = { name:'Custom', body:'' };
 
@@ -1738,11 +1697,6 @@ function trimHistory() {
   }
 }
 
-// ── Multi-phase generation pipeline ───────────────────────────
-// Generates output in focused sequential phases for better quality
-// and lower per-request token usage.
-var PIPELINE_ENABLED = true; // can be toggled in settings
-
 // Phase display names
 var PHASE_LABELS = { concept:'Concept', p5:'p5.js Preview', pde:'Processing Code', explain:'Explanations' };
 
@@ -1765,415 +1719,10 @@ function setVeilPhase(phase, state, detail) {
   if (detail !== undefined) G('veil-detail').textContent = detail;
 }
 
-async function generatePipeline(task, attachments) {
-  var s = getSettings();
-  var phases = [];
-
-  phases.push('concept');
-  if (s.p5) phases.push('p5');
-  if (s.pde) phases.push('pde');
-  if ((s.pde && s.pdeExp) || (s.p5 && s.p5Exp)) phases.push('explain');
-
-  if (phases.length <= 2 || !PIPELINE_ENABLED) {
-    G('veil-phases').innerHTML = '';
-    G('veil-detail').textContent = '';
-    return await callClaude(task, attachments);
-  }
-
-  // Show phase indicators in veil
-  initVeilPhases(phases);
-  G('veil-title').textContent = 'Generating Sketch';
-
-  var result = { title:'', desc:'', pdecode:'', pdeexp:'', p5code:'', p5exp:'', actualModel:'', requestedModel: MODEL };
-  var base = buildUserPrompt(task);
-  var provider = providerFor(MODEL);
-  var errors = [];
-
-  trimHistory();
-
-  // ── Phase 1: Concept ──
-  setVeilPhase('concept', 'active', 'Generating concept and title…');
-  setStatus('run', 'phase 1/' + phases.length + ' — concept…');
-  try {
-    var conceptResult = await callPhase('concept', base, attachments, provider, s);
-    var conceptParsed = parseResponse(conceptResult.text);
-    result.title = conceptParsed.title;
-    result.desc = conceptParsed.desc;
-    result.actualModel = conceptResult.model;
-    result.requestedModel = MODEL;
-    setVeilPhase('concept', 'done', '✓ Concept: ' + (result.title || 'done'));
-
-    if (result.title) {
-      G('cph').style.display='none';
-      G('ctitle').textContent = cleanConceptText(result.title);
-      G('ctitle').style.display = 'block';
-      G('cbody').textContent = cleanConceptText(result.desc);
-      G('cbody').style.display = 'block';
-    }
-  } catch(e) {
-    console.error('Pipeline concept phase failed:', e);
-    setVeilPhase('concept', 'fail', '✗ Concept failed: ' + e.message);
-    errors.push('Concept: ' + e.message);
-    // Can't continue without concept — fall back to single-shot
-    G('veil-detail').textContent = 'Falling back to single-shot generation…';
-    return await callClaude(task, attachments);
-  }
-
-  var conceptContext = '### ' + (result.title || 'Untitled') + '\n' + (result.desc || '');
-
-  // ── Phase 2: p5.js ──
-  if (phases.indexOf('p5') > -1) {
-    var p5idx = phases.indexOf('p5') + 1;
-    setVeilPhase('p5', 'active', 'Generating p5.js preview sketch…');
-    setStatus('run', 'phase ' + p5idx + '/' + phases.length + ' — p5.js…');
-    G('code-display').textContent = '// Generating p5.js preview…';
-    try {
-      var p5prompt;
-      if (stored.p5code) {
-        // Follow-up: include the existing code so the model modifies it instead of starting from scratch
-        p5prompt = 'MODIFY the existing p5.js sketch below to match the updated concept. Keep all existing functionality and add/change only what the user requests.\n\n' +
-          'Updated concept:\n' + conceptContext + '\n\n' +
-          'EXISTING CODE (modify this — do NOT rewrite from scratch):\n```p5instance\n' + stored.p5code + '\n```\n\n' +
-          'User request: ' + task + '\n\n' +
-          'Return the COMPLETE modified sketch with all original features preserved plus the requested changes.';
-      } else {
-        p5prompt = 'Implement this concept as a p5.js sketch:\n\n' + conceptContext + '\n\nUser request: ' + task;
-      }
-      var p5Result = await callPhase('p5', p5prompt, null, provider, s);
-      var p5Parsed = parseResponse(p5Result.text);
-      result.p5code = p5Parsed.p5code;
-      result.actualModel = p5Result.model;
-      setVeilPhase('p5', 'done', '✓ p5.js preview generated');
-
-      if (result.p5code) {
-        stored.p5code = result.p5code;
-        lastFnP5 = result.p5code;
-        var p5err = runP5(result.p5code);
-        showPreviewActions(true);
-
-        // Auto-fix: if sketch had errors and auto-fix is enabled, try once more
-        if (p5err && AUTOFIX_ENABLED) {
-          setVeilPhase('p5', 'active', '🔧 Auto-fixing preview error…');
-          setStatus('run', 'phase ' + p5idx + '/' + phases.length + ' — auto-fix…');
-          try {
-            var fixPrompt = 'The following p5.js sketch has a runtime error:\n\nError: ' + p5err + '\n\nOriginal code:\n```\n' + result.p5code + '\n```\n\nFix the error and return the corrected sketch. NEVER use document.getElementById(), document.querySelector(), p.select(), appendChild, or any direct DOM access. Use ONLY p5 instance methods (p.createButton, p.createSlider, p.createDiv, etc.). Store slider references in variables and read with .value() — never use p.slider() or p.this.\n\nUser request: ' + task;
-            var fixResult = await callPhase('p5', fixPrompt, null, provider, s);
-            var fixParsed = parseResponse(fixResult.text);
-            if (fixParsed.p5code) {
-              result.p5code = fixParsed.p5code;
-              stored.p5code = fixParsed.p5code;
-              lastFnP5 = fixParsed.p5code;
-              var fixErr = runP5(fixParsed.p5code);
-              if (!fixErr) {
-                setVeilPhase('p5', 'done', '✓ p5.js fixed & running');
-                addBubble('🔧 Auto-fixed preview error: <code>' + escHtml(p5err) + '</code>', 'claude');
-              } else {
-                setVeilPhase('p5', 'done', '⚠ p5.js auto-fix partial');
-              }
-            }
-          } catch(fixE) {
-            console.error('Auto-fix failed:', fixE);
-            setVeilPhase('p5', 'done', '⚠ Auto-fix failed');
-          }
-        } else if (!p5err) {
-          // no error, already marked done above
-        }
-      }
-    } catch(e) {
-      console.error('Pipeline p5 phase failed:', e);
-      setVeilPhase('p5', 'fail', '✗ p5.js failed: ' + e.message);
-      errors.push('p5.js: ' + e.message);
-    }
-  }
-
-  // ── Phase 3: Processing ──
-  if (phases.indexOf('pde') > -1) {
-    var pdeIdx = phases.indexOf('pde') + 1;
-    setVeilPhase('pde', 'active', 'Generating Processing Java code…');
-    setStatus('run', 'phase ' + pdeIdx + '/' + phases.length + ' — Processing…');
-    G('code-display').textContent = '// Generating Processing code…';
-    try {
-      var pdePrompt;
-      if (stored.pdecode) {
-        pdePrompt = 'MODIFY the existing Processing Java sketch below to match the updated concept. Keep all existing functionality and add/change only what the user requests.\n\n' +
-          'Updated concept:\n' + conceptContext + '\n\n' +
-          'EXISTING CODE (modify this — do NOT rewrite from scratch):\n```processing\n' + stored.pdecode + '\n```\n\n' +
-          'User request: ' + task + '\n\n' +
-          'Return the COMPLETE modified sketch with all original features preserved plus the requested changes.';
-      } else {
-        pdePrompt = 'Implement this concept as a Processing Java sketch:\n\n' + conceptContext + '\n\nUser request: ' + task;
-      }
-      var pdeResult = await callPhase('pde', pdePrompt, null, provider, s);
-      var pdeParsed = parseResponse(pdeResult.text);
-      result.pdecode = pdeParsed.pdecode;
-      setVeilPhase('pde', 'done', '✓ Processing code generated');
-
-      if (result.pdecode) {
-        setCodeDisplay(result.pdecode, 'pde');
-      }
-    } catch(e) {
-      console.error('Pipeline pde phase failed:', e);
-      setVeilPhase('pde', 'fail', '✗ Processing failed: ' + e.message);
-      errors.push('Processing: ' + e.message);
-    }
-  }
-
-  // ── Phase 4: Explanations ──
-  if (phases.indexOf('explain') > -1) {
-    setVeilPhase('explain', 'active', 'Writing code explanations…');
-    setStatus('run', 'phase ' + phases.length + '/' + phases.length + ' — explanations…');
-    try {
-      var codeCtx = '';
-      if (result.p5code) codeCtx += '\n\np5.js code:\n```\n' + result.p5code.substring(0, 800) + '\n```';
-      if (result.pdecode) codeCtx += '\n\nProcessing code:\n```\n' + result.pdecode.substring(0, 800) + '\n```';
-      var expPrompt = 'Write explanations for this sketch:\n\n' + conceptContext + codeCtx;
-      var expResult = await callPhase('explain', expPrompt, null, provider, s);
-      var expParsed = parseResponse(expResult.text);
-      result.pdeexp = expParsed.pdeexp;
-      result.p5exp = expParsed.p5exp;
-      setVeilPhase('explain', 'done', '✓ Explanations ready');
-    } catch(e) {
-      console.error('Pipeline explain phase failed:', e);
-      setVeilPhase('explain', 'fail', '✗ Explanations failed: ' + e.message);
-      errors.push('Explanations: ' + e.message);
-    }
-  }
-
-  // Report errors in chat if any phases failed
-  if (errors.length) {
-    addBubble('⚠ Some phases had errors:<br>' + errors.map(function(e){ return '• ' + e; }).join('<br>'), 'claude', 'err');
-  }
-
-  // Store the combined result in chatHistory so follow-up requests have context
-  var combinedOutput = '';
-  if (result.title) combinedOutput += '### ' + result.title + '\n' + result.desc + '\n\n';
-  if (result.p5code) combinedOutput += '### p5 sketch\n```p5instance\n' + result.p5code + '\n```\n\n';
-  if (result.pdecode) combinedOutput += '### Processing code\n```processing\n' + result.pdecode + '\n```\n\n';
-  if (result.p5exp) combinedOutput += '### How it works (p5.js)\n' + result.p5exp + '\n\n';
-  if (result.pdeexp) combinedOutput += '### How it works (Processing)\n' + result.pdeexp + '\n\n';
-  if (combinedOutput) {
-    chatHistory.push({ role: 'user', content: base });
-    chatHistory.push({ role: 'assistant', content: combinedOutput });
-  }
-
-  return result;
-}
-
-// ── Debug log ─────────────────────────────────────────────────
-var debugLog = [];
-var dbgGeneration = 0;
-function dbgAdd(phase, direction, content, meta) {
-  debugLog.push({ gen: dbgGeneration, phase: phase, dir: direction, content: content, meta: meta || {}, time: new Date() });
-  renderDbgLog();
-}
-function dbgNewGeneration() {
-  dbgGeneration++;
-  debugLog.push({ gen: dbgGeneration, separator: true, time: new Date() });
-  renderDbgLog();
-  G('dbg-toggle').classList.add('has-log');
-}
-var DIR_LABELS = {
-  'system prompt': '📋 System Prompt',
-  'user message': '👤 User Message',
-  'response': '🤖 Model Response',
-  '→ request': '👤 → Request Body',
-  '← response': '🤖 ← Response',
-  'response (academic)': '🤖 ← Response'
-};
-function renderDbgLog() {
-  var el = G('dbg-log');
-  if (!el) return;
-  el.innerHTML = '';
-  for (var i = 0; i < debugLog.length; i++) {
-    var e = debugLog[i];
-    if (e.separator) {
-      var sep = document.createElement('div');
-      sep.className = 'dbg-separator';
-      sep.innerHTML = '── Generation #' + e.gen + ' ── <span class="dbg-time">' + e.time.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'}) + '</span>';
-      el.appendChild(sep);
-      continue;
-    }
-    var entry = document.createElement('div');
-    entry.className = 'dbg-entry';
-    var ts = e.time.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'});
-    var dirLabel = DIR_LABELS[e.dir] || e.dir;
-    var phaseLabel = PHASE_LABELS[e.phase] || e.phase || 'single-shot';
-    var hdr = '<div class="dbg-entry-hdr"><span><span class="dbg-phase">' + phaseLabel + '</span> — ' + dirLabel + '</span><span class="dbg-time">' + ts + '</span></div>';
-    var body = '<div class="dbg-section"><div class="dbg-section-label">' + dirLabel + '</div><pre>' + escHtml(typeof e.content === 'string' ? e.content : JSON.stringify(e.content, null, 2)) + '</pre></div>';
-    if (e.meta && Object.keys(e.meta).length) {
-      body += '<div class="dbg-section"><div class="dbg-section-label">📊 Meta</div><pre>' + escHtml(JSON.stringify(e.meta, null, 2)) + '</pre></div>';
-    }
-    entry.innerHTML = hdr + body;
-    el.appendChild(entry);
-  }
-  el.scrollTop = el.scrollHeight;
-}
+// ── Debug log (stubbed in artifact edition) ───────────────────
+function dbgAdd() {}
+function dbgNewGeneration() {}
 function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-
-// ── Call a single phase ─
-// For concept phase: include chatHistory so follow-up requests have context
-// For other phases: stateless (only system + user message)
-async function callPhase(phase, userMsg, attachments, provider, s) {
-  var sysPrompt = buildPhasePrompt(phase, s);
-  var maxTokens = phase === 'concept' ? 1500 : phase === 'explain' ? 3000 : 8000;
-  // Concept phase includes chat history for follow-up context
-  var history = (phase === 'concept' && chatHistory.length > 0) ? chatHistory.slice() : [];
-  dbgAdd(phase, 'system prompt', sysPrompt, { model: MODEL, provider: provider, maxTokens: maxTokens, historyTurns: history.length });
-  dbgAdd(phase, 'user message', userMsg);
-
-  var result;
-  if (provider === 'academic') {
-    result = await callPhaseAcademic(sysPrompt, userMsg, maxTokens, history);
-  } else if (provider === 'gemini') {
-    result = await callPhaseGemini(sysPrompt, userMsg, attachments, maxTokens, history);
-  } else {
-    result = await callPhaseAnthropic(sysPrompt, userMsg, attachments, maxTokens, history);
-  }
-  dbgAdd(phase, 'response', result.text, { model: result.model });
-  return result;
-}
-
-async function callPhaseAcademic(sysPrompt, userMsg, maxTokens, history) {
-  var BASE_URL = 'https://chat-ai.academiccloud.de/v1/chat/completions';
-  var ACADEMIC_URL;
-  if (academicCorsProxy) {
-    var p = academicCorsProxy.replace(/\/+$/, '');
-    if (/^https?:\/\/(localhost|127\.0\.0\.1)/i.test(p)) {
-      ACADEMIC_URL = p + '/v1/chat/completions';
-    } else {
-      ACADEMIC_URL = p + '/' + BASE_URL;
-    }
-  } else { ACADEMIC_URL = BASE_URL; }
-  var key = apiKeys.academic || ACADEMIC_CLOUD_KEY_DEFAULT;
-  if (!key) throw new Error('Academic Cloud: No API key set.');
-
-  var messages = [{ role: 'system', content: sysPrompt }];
-  // Include chat history for follow-up context (concept phase)
-  if (history && history.length) {
-    for (var i = 0; i < history.length; i++) {
-      var h = history[i];
-      var text = typeof h.content === 'string' ? h.content
-        : (Array.isArray(h.content) ? h.content.filter(function(b){return b.type==='text';}).map(function(b){return b.text;}).join('\n') : '');
-      if (text) messages.push({ role: h.role === 'assistant' ? 'assistant' : 'user', content: text });
-    }
-  }
-  messages.push({ role: 'user', content: userMsg });
-
-  var res = await fetch(ACADEMIC_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
-    body: JSON.stringify({ model: MODEL, messages: messages, temperature: 0.7, max_tokens: maxTokens })
-  });
-  if (!res.ok) {
-    var rawErr = await res.text().catch(function(){ return ''; });
-    var msg = 'HTTP ' + res.status;
-    try { var err = JSON.parse(rawErr); msg = (err.error && err.error.message) || err.message || rawErr || msg; } catch(e) { if(rawErr) msg = rawErr; }
-    throw new Error('Academic Cloud: ' + msg);
-  }
-  var data = await res.json();
-  var raw = data.choices && data.choices[0] && data.choices[0].message ? data.choices[0].message.content : '';
-  if (!raw) throw new Error('Academic Cloud: empty response');
-  raw = raw.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
-  if (!raw) throw new Error('Academic Cloud: response was only thinking tokens (no output)');
-  if (data.usage) { sessionTokens.input += (data.usage.prompt_tokens||0); sessionTokens.output += (data.usage.completion_tokens||0); sessionTokens.requests++; }
-  return { text: raw, model: data.model || MODEL };
-}
-
-async function callPhaseAnthropic(sysPrompt, userMsg, attachments, maxTokens, history) {
-  var msgContent;
-  if (attachments && attachments.length) {
-    msgContent = [];
-    for (var i = 0; i < attachments.length; i++) {
-      var f = attachments[i];
-      if (f.type.startsWith('image/')) {
-        msgContent.push({ type:'image', source:{ type:'base64', media_type:f.type, data:f.b64 } });
-      } else {
-        msgContent.push({ type:'text', text:'[Attached: '+f.name+']\n'+atob(f.b64) });
-      }
-    }
-    msgContent.push({ type:'text', text: userMsg });
-  } else {
-    msgContent = userMsg;
-  }
-  var hdrs = { 'Content-Type':'application/json', 'anthropic-version':'2023-06-01' };
-  if (apiKeys.anthropic) {
-    hdrs['x-api-key'] = apiKeys.anthropic;
-    hdrs['anthropic-dangerous-direct-browser-access'] = 'true';
-  }
-  // Build messages: include history for follow-up context if provided
-  var msgs = [];
-  if (history && history.length) {
-    for (var j = 0; j < history.length; j++) { msgs.push(history[j]); }
-  }
-  msgs.push({ role:'user', content:msgContent });
-  var body = { model:MODEL, max_tokens:maxTokens, system:sysPrompt, messages:msgs };
-  if (thinkingBudget > 0 && isClaudeModel(MODEL)) {
-    body.thinking = { type:'enabled', budget_tokens:thinkingBudget };
-    body.max_tokens = Math.max(maxTokens, thinkingBudget + 2000);
-  }
-  var res = await fetch('https://api.anthropic.com/v1/messages', { method:'POST', headers:hdrs, body:JSON.stringify(body) });
-  if (!res.ok) {
-    var e = await res.json().catch(function(){ return {}; });
-    throw new Error('Anthropic: ' + (e && e.error && e.error.message ? e.error.message : 'HTTP '+res.status));
-  }
-  var data = await res.json();
-  var raw = (data.content||[]).map(function(b){ return b.text||''; }).join('');
-  if (data.usage) { sessionTokens.input += (data.usage.input_tokens||0); sessionTokens.output += (data.usage.output_tokens||0); sessionTokens.requests++; }
-  return { text: raw, model: data.model || MODEL };
-}
-
-async function callPhaseGemini(sysPrompt, userMsg, attachments, maxTokens, history) {
-  if (!apiKeys.gemini) throw new Error('Gemini API key required.');
-  var parts = [];
-  if (attachments && attachments.length) {
-    for (var i = 0; i < attachments.length; i++) {
-      var f = attachments[i];
-      if (f.type.startsWith('image/')) {
-        parts.push({ inline_data:{ mime_type:f.type, data:f.b64 } });
-      } else {
-        parts.push({ text:'[Attached: '+f.name+']\n'+atob(f.b64) });
-      }
-    }
-  }
-  parts.push({ text: userMsg });
-  // Build contents: include history for follow-up context if provided
-  var contents = [];
-  if (history && history.length) {
-    for (var j = 0; j < history.length; j++) {
-      var h = history[j];
-      var role = h.role === 'assistant' ? 'model' : 'user';
-      var hParts = [];
-      if (typeof h.content === 'string') { hParts.push({ text: h.content }); }
-      else if (Array.isArray(h.content)) {
-        for (var k = 0; k < h.content.length; k++) {
-          var b = h.content[k];
-          if (b.type === 'text') hParts.push({ text: b.text });
-        }
-      }
-      if (hParts.length) contents.push({ role: role, parts: hParts });
-    }
-  }
-  contents.push({ role:'user', parts:parts });
-  var url = 'https://generativelanguage.googleapis.com/v1beta/models/' + MODEL + ':generateContent';
-  var body = {
-    systemInstruction: { parts:[{ text:sysPrompt }] },
-    contents: contents,
-    generationConfig: { maxOutputTokens:maxTokens, temperature:1.0 }
-  };
-  var res = await fetch(url, { method:'POST', headers:{ 'Content-Type':'application/json', 'x-goog-api-key':apiKeys.gemini }, body:JSON.stringify(body) });
-  if (!res.ok) {
-    var err = await res.json().catch(function(){ return {}; });
-    throw new Error('Gemini: ' + (err && err.error && err.error.message ? err.error.message : 'HTTP '+res.status));
-  }
-  var data = await res.json();
-  var raw = '';
-  if (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts) {
-    raw = data.candidates[0].content.parts.map(function(p){ return p.text||''; }).join('');
-  }
-  if (!raw) throw new Error('Gemini returned no text');
-  if (data.usageMetadata) { sessionTokens.input += (data.usageMetadata.promptTokenCount||0); sessionTokens.output += (data.usageMetadata.candidatesTokenCount||0); sessionTokens.requests++; }
-  return { text: raw, model: data.modelVersion || MODEL };
-}
 
 // ── Build user prompt (task + template additions) ─────────────
 function buildUserPrompt(task) {
@@ -2303,7 +1852,6 @@ async function callAcademicCloud(task, base, attachments) {
   raw = raw.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
 
   chatHistory.push({ role: 'assistant', content: raw });
-  if (data.usage) { sessionTokens.input += (data.usage.prompt_tokens||0); sessionTokens.output += (data.usage.completion_tokens||0); sessionTokens.requests++; }
   dbgAdd('legacy', 'response (academic)', raw, { model: data.model || MODEL });
   var parsed = parseResponse(raw);
   parsed.actualModel = data.model || MODEL;
@@ -2355,7 +1903,6 @@ async function callAnthropic(task, base, attachments) {
   var data=await res.json();
   var raw=(data.content||[]).map(function(b){return b.text||'';}).join('');
   dbgAdd('legacy','← response',raw,{provider:'anthropic',model:data.model||MODEL,usage:data.usage});
-  if (data.usage) { sessionTokens.input += (data.usage.input_tokens||0); sessionTokens.output += (data.usage.output_tokens||0); sessionTokens.requests++; }
   chatHistory.push({role:'assistant',content:raw});
   var parsed = parseResponse(raw);
   parsed.actualModel = data.model || '(unknown)';
@@ -2452,7 +1999,6 @@ async function callGemini(task, base, attachments) {
   }
 
   dbgAdd('legacy','← response',raw,{provider:'gemini',model:data.modelVersion||MODEL,usage:data.usageMetadata});
-  if (data.usageMetadata) { sessionTokens.input += (data.usageMetadata.promptTokenCount||0); sessionTokens.output += (data.usageMetadata.candidatesTokenCount||0); sessionTokens.requests++; }
   chatHistory.push({ role: 'assistant', content: raw });
   var parsed = parseResponse(raw);
   parsed.actualModel = data.modelVersion || MODEL;
@@ -2612,103 +2158,12 @@ async function checkAvailableModels(provider) {
   }
 }
 
-// Session manager
-var SESSIONS_KEY = 'plotterStudio_sessions';
-function loadSessions(){ try{return JSON.parse(localStorage.getItem(SESSIONS_KEY)||'[]');}catch(e){return[];} }
-function saveSessions(arr){ try{localStorage.setItem(SESSIONS_KEY,JSON.stringify(arr));}catch(e){} }
-function renderSessionList(){
-  var sessions=loadSessions(), list=G('session-list'), empty=G('session-empty');
-  list.innerHTML='';
-  if(!sessions.length){empty.style.display='block';return;}
-  empty.style.display='none';
-  sessions.slice().reverse().forEach(function(s,ri){
-    var idx=sessions.length-1-ri;
-    var item=document.createElement('div'); item.className='session-item';
-    var d=new Date(s.ts);
-    var ds=d.toLocaleDateString('de-DE')+' '+d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
-    item.innerHTML='<span class=session-item-name>'+(s.name||'Untitled')+'</span>'+
-      '<span class=session-item-date>'+ds+'</span>'+
-      '<button class=session-item-del title=Delete>×</button>';
-    item.querySelector('.session-item-del').addEventListener('click',function(e){
-      e.stopPropagation(); var arr=loadSessions(); arr.splice(idx,1); saveSessions(arr); renderSessionList();
-    });
-    item.addEventListener('click',function(){
-      loadSession(s); closeSessionPanel();
-      addBubble('Session <strong>'+(s.name||'Untitled')+'</strong> loaded.','claude');
-    });
-    list.appendChild(item);
-  });
-}
-function saveCurrentSession(){
-  var name=G('session-name-input').value.trim()||('Session '+new Date().toLocaleDateString('de-DE'));
-  var sessions=loadSessions();
-  var sessionData={name:name,ts:Date.now(),chatHistory:chatHistory,stored:stored,
-    model:MODEL,settings:getSettings(),currentTemplate:currentTemplate,customTemplate:customTemplate,
-    tokens:{ input:sessionTokens.input, output:sessionTokens.output, requests:sessionTokens.requests }};
-  sessions.push(sessionData);
-  if(sessions.length>20) sessions=sessions.slice(-20);
-  saveSessions(sessions); G('session-name-input').value='';
-  renderSessionList();
-  // Also download as .txt file
-  var lines = [];
-  lines.push('# Plotter Studio — Session: ' + name);
-  lines.push('# Saved: ' + new Date().toISOString());
-  lines.push('# Model: ' + MODEL);
-  lines.push('# Token Usage: ' + sessionTokens.input + ' input, ' + sessionTokens.output + ' output (' + sessionTokens.requests + ' requests)');
-  lines.push('# Template: ' + (currentTemplate === 'custom' ? (customTemplate.name||'Custom') : 'dMA Creative Coding'));
-  lines.push('');
-  lines.push('═══════════════════════════════════════════');
-  lines.push('  CHAT HISTORY');
-  lines.push('═══════════════════════════════════════════');
-  lines.push('');
-  for (var i = 0; i < chatHistory.length; i++) {
-    var h = chatHistory[i];
-    var text = typeof h.content === 'string' ? h.content
-      : (Array.isArray(h.content) ? h.content.filter(function(b){return b.type==='text';}).map(function(b){return b.text;}).join('\n') : JSON.stringify(h.content));
-    lines.push('─── ' + h.role.toUpperCase() + ' ───');
-    lines.push(text);
-    lines.push('');
-  }
-  if (!chatHistory.length) lines.push('(no chat history)');
-  lines.push('');
-  lines.push('═══════════════════════════════════════════');
-  lines.push('  GENERATED CODE');
-  lines.push('═══════════════════════════════════════════');
-  lines.push('');
-  if (stored.title) { lines.push('Title: ' + stored.title); lines.push(stored.desc || ''); lines.push(''); }
-  if (stored.p5code) { lines.push('─── p5.js Sketch ───'); lines.push(stored.p5code); lines.push(''); }
-  if (stored.pdecode) { lines.push('─── Processing Code ───'); lines.push(stored.pdecode); lines.push(''); }
-  if (stored.p5exp) { lines.push('─── p5.js Explanation ───'); lines.push(stored.p5exp); lines.push(''); }
-  if (stored.pdeexp) { lines.push('─── Processing Explanation ───'); lines.push(stored.pdeexp); lines.push(''); }
-  if (!stored.p5code && !stored.pdecode) lines.push('(no code generated yet)');
-  var safeName = name.replace(/[^a-zA-Z0-9_-]/g, '_');
-  downloadText(lines.join('\n'), 'plotter_studio_session_' + safeName + '_' + new Date().toISOString().slice(0,10) + '.txt', 'text/plain');
-  addBubble('Session <strong>'+name+'</strong> saved and exported.','claude');
-}
-function loadSession(s){
-  if(Array.isArray(s.chatHistory)) chatHistory=s.chatHistory;
-  if(s.stored) stored=Object.assign({title:'',desc:'',pdecode:'',p5code:'',pdeexp:'',p5exp:''},s.stored);
-  if(s.tokens) sessionTokens=Object.assign({input:0,output:0,requests:0},s.tokens);
-  else sessionTokens={input:0,output:0,requests:0};
-  if(s.model){MODEL=s.model; var lbl=MODEL_LABELS[s.model]||s.model; G('model-btn-label').textContent=lbl; G('cl-sub-model').textContent=lbl;}
-  if(s.settings) applySettings(s.settings);
-  if(s.customTemplate) customTemplate=s.customTemplate;
-  if(s.currentTemplate) setActiveTpl(s.currentTemplate);
-  restorePanels(); updateThinkingBar();
-}
-function openSessionPanel(){ renderSessionList(); G('session-panel').classList.add('open'); G('session-overlay').classList.add('open'); }
-function closeSessionPanel(){ G('session-panel').classList.remove('open'); G('session-overlay').classList.remove('open'); }
-G('session-btn').addEventListener('click',function(e){e.stopPropagation();openSessionPanel();});
-G('session-close').addEventListener('click',closeSessionPanel);
-G('session-overlay').addEventListener('click',closeSessionPanel);
-G('session-save-btn').addEventListener('click',saveCurrentSession);
-
 // Reset
 G('reset-btn').addEventListener('click',function(){G('reset-confirm').classList.add('open');});
 G('rc-cancel').addEventListener('click',function(){G('reset-confirm').classList.remove('open');});
 G('rc-ok').addEventListener('click',function(){
   try{[PREFS_KEY,'plotterStudio_theme','plotterStudio_apiKey',
-    'plotterStudio_apiKey_anthropic','plotterStudio_apiKey_gemini',SESSIONS_KEY].forEach(function(k){localStorage.removeItem(k);});}catch(e){}
+    'plotterStudio_apiKey_anthropic','plotterStudio_apiKey_gemini'].forEach(function(k){localStorage.removeItem(k);});}catch(e){}
   G('reset-confirm').classList.remove('open'); location.reload();
 });
 
@@ -2949,11 +2404,8 @@ function getSettings(){return{
   pde:G('opt-pde').checked, pdeExp:G('opt-pde-exp').checked,
   p5:G('opt-p5').checked, p5Exp:G('opt-p5-exp').checked,
   textBtn:G('opt-text-btn').checked, lineTextBtn:G('opt-linetext-btn').checked,
-  reseedBtn:G('opt-reseed-btn').checked, sliders:G('opt-sliders').checked,
-  pipeline:G('opt-pipeline').checked,
-  autofix:G('opt-autofix').checked
+  reseedBtn:G('opt-reseed-btn').checked, sliders:G('opt-sliders').checked
 };}
-var AUTOFIX_ENABLED = true;
 function applySettings(s){
   if(s.pde!==undefined)       G('opt-pde').checked         = s.pde;
   if(s.pdeExp!==undefined)    G('opt-pde-exp').checked     = s.pdeExp;
@@ -2963,14 +2415,8 @@ function applySettings(s){
   if(s.lineTextBtn!==undefined) G('opt-linetext-btn').checked = s.lineTextBtn;
   if(s.reseedBtn!==undefined) G('opt-reseed-btn').checked  = s.reseedBtn;
   if(s.sliders!==undefined)   G('opt-sliders').checked     = s.sliders;
-  if(s.pipeline!==undefined)  G('opt-pipeline').checked    = s.pipeline;
-  if(s.autofix!==undefined)   G('opt-autofix').checked     = s.autofix;
-  PIPELINE_ENABLED = G('opt-pipeline').checked;
-  AUTOFIX_ENABLED = G('opt-autofix').checked;
 }
 document.querySelectorAll('.sp-cb').forEach(function(cb){cb.addEventListener('change',function(){
-  PIPELINE_ENABLED = G('opt-pipeline').checked;
-  AUTOFIX_ENABLED = G('opt-autofix').checked;
   saveState();
 });});
 
@@ -3090,9 +2536,7 @@ function restorePanels(){
   showHowto(currentTab);
   if(stored.p5code){lastFnP5=stored.p5code;runP5(stored.p5code);showPreviewActions(true);}
 }
-var lastP5Error = null;
 function runP5(fnStr,seed){
-  lastP5Error = null;
   if(p5inst){p5inst.remove();p5inst=null;}
   var w=G('p5w');w.innerHTML='';
   var fn=fnStr;if(seed!==undefined)fn=fn.replace(/let seed\s*=\s*\d+\s*;/,'let seed = '+seed+';');
@@ -3102,15 +2546,12 @@ function runP5(fnStr,seed){
     p5inst=new p5(eval('('+fn+')'),w);
   }catch(e){
     console.error('p5 error',e);
-    lastP5Error = e.message;
     addBubble('Preview error: '+e.message,'claude','err');
     // Show idle animation again if sketch completely failed to create
     if (!w.querySelector('canvas')) {
       G('pph').style.display='';
     }
   }
-  // Also catch runtime errors from setup/draw via window.onerror
-  return lastP5Error;
 }
 G('rbtn').addEventListener('click',function(){if(lastFnP5)runP5(lastFnP5,Math.floor(Math.random()*999999));});
 
@@ -3133,7 +2574,6 @@ async function send(){
   inp.value='';
   var attachments=pendingFiles.filter(Boolean);pendingFiles=[];G('attach-chips').innerHTML='';
   addBubble(text+(attachments.length?' [+'+attachments.length+' file(s)]':''),'user');
-  dbgNewGeneration();
   setTyping(true);setStatus('run','generating…');setVeil(true);
   G('cph').style.display='flex';G('ctitle').style.display='none';G('cbody').style.display='none';
   G('code-display').textContent='// Generating…';
@@ -3144,42 +2584,17 @@ async function send(){
   G('csend').disabled=true;
   try{
     var r;
-    var s = getSettings();
-    var phaseCount = 1 + (s.p5?1:0) + (s.pde?1:0) + ((s.pde&&s.pdeExp)||(s.p5&&s.p5Exp)?1:0);
-    if (PIPELINE_ENABLED && phaseCount >= 3) {
-      r = await generatePipeline(text, attachments);
-    } else {
-      r = await callClaude(text, attachments);
-    }
+    r = await callClaude(text, attachments);
     renderAll(r);
-
-    // Auto-fix for single-shot mode — use focused p5 phase caller, not full callClaude
-    if (lastP5Error && AUTOFIX_ENABLED && r.p5code) {
-      setStatus('run', 'auto-fixing preview…');
-      G('veil-detail').textContent = '🔧 Auto-fixing preview error: ' + lastP5Error;
-      try {
-        var fixMsg = 'The following p5.js sketch has a runtime error:\n\nError: ' + lastP5Error + '\n\nOriginal code:\n```\n' + r.p5code + '\n```\n\nFix the error and return the corrected sketch. NEVER use document.getElementById(), document.querySelector(), p.select(), appendChild, or any direct DOM access. Use ONLY p5 instance methods (p.createButton, p.createSlider, p.createDiv, etc.). Store slider references in variables and read them with .value() — never use p.slider() or p.this.';
-        var fixResult = await callPhase('p5', fixMsg, null, providerFor(MODEL), getSettings());
-        var fixParsed = parseResponse(fixResult.text);
-        if (fixParsed.p5code) {
-          r.p5code = fixParsed.p5code;
-          renderAll(r);
-          if (!lastP5Error) addBubble('🔧 Auto-fixed preview error successfully.', 'claude');
-        }
-      } catch(fixE) { console.error('Auto-fix failed:', fixE); }
-    }
 
     // Verify: was the requested model actually used?
     var match = r.actualModel && r.actualModel.indexOf(r.requestedModel.replace(/-\d{8}$/, '')) > -1;
-    var pipelineNote = (PIPELINE_ENABLED && phaseCount >= 3)
-      ? '<br><span style="color:var(--txdim)">⚡ Generated in ' + phaseCount + ' focused phases</span>'
-      : '';
     var modelLine = match
       ? '✓ Model used: <strong style="color:var(--grn)">' + r.actualModel + '</strong>'
       : '⚠ <strong style="color:var(--pink)">Model mismatch</strong> — requested <code>' + r.requestedModel + '</code> but actually used <code>' + r.actualModel + '</code>';
 
     addBubble(
-      'Done — all panels updated.<br>' + modelLine + pipelineNote + '<br>' +
+      'Done — all panels updated.<br>' + modelLine + '<br>' +
       '<button class="dl-btn" onclick="document.getElementById(\'dlpde-btn\').click()">↓ .pde</button>'+
       '<button class="dl-btn" onclick="document.getElementById(\'dlp5-btn\').click()">↓ .js</button>'+
       '<button class="dl-btn" onclick="triggerHtmlDownload()">↓ .html</button>',
@@ -3194,50 +2609,6 @@ async function send(){
 }
 G('csend').addEventListener('click',send);
 G('cin').addEventListener('keydown',function(e){if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();send();}});
-G('dbg-toggle').addEventListener('click',function(e){e.stopPropagation();G('dbg-overlay').classList.toggle('open');});
-G('dbg-close').addEventListener('click',function(e){e.stopPropagation();G('dbg-overlay').classList.remove('open');});
-G('dbg-overlay').addEventListener('click',function(e){if(e.target===this)this.classList.remove('open');});
-// Escape key closes debug overlay
-document.addEventListener('keydown',function(e){if(e.key==='Escape'&&G('dbg-overlay').classList.contains('open')){G('dbg-overlay').classList.remove('open');}});
-
-// ── Export: Chat History ──
-G('export-history-btn').addEventListener('click',function(){
-  var lines = [];
-  lines.push('# Plotter Studio — Chat History');
-  lines.push('# Exported: ' + new Date().toISOString());
-  lines.push('# Model: ' + MODEL);
-  lines.push('');
-  for (var i = 0; i < chatHistory.length; i++) {
-    var h = chatHistory[i];
-    var text = typeof h.content === 'string' ? h.content
-      : (Array.isArray(h.content) ? h.content.filter(function(b){return b.type==='text';}).map(function(b){return b.text;}).join('\n') : JSON.stringify(h.content));
-    lines.push('=== ' + h.role.toUpperCase() + ' ===');
-    lines.push(text);
-    lines.push('');
-  }
-  if (!chatHistory.length) lines.push('(no chat history yet)');
-  downloadText(lines.join('\n'), 'plotter_studio_chat_' + new Date().toISOString().slice(0,10) + '.txt', 'text/plain');
-});
-
-// ── Export: Debug Log ──
-G('export-debug-btn').addEventListener('click',function(){
-  var lines = [];
-  lines.push('# Plotter Studio — Debug Log');
-  lines.push('# Exported: ' + new Date().toISOString());
-  lines.push('');
-  for (var i = 0; i < debugLog.length; i++) {
-    var e = debugLog[i];
-    if (e.separator) { lines.push('\n══════════ Generation #' + e.gen + ' ══════════ ' + e.time.toLocaleTimeString() + '\n'); continue; }
-    var phaseLabel = PHASE_LABELS[e.phase] || e.phase || 'single-shot';
-    var dirLabel = DIR_LABELS[e.dir] || e.dir;
-    lines.push('── ' + phaseLabel + ' — ' + dirLabel + ' ── ' + e.time.toLocaleTimeString());
-    lines.push(typeof e.content === 'string' ? e.content : JSON.stringify(e.content, null, 2));
-    if (e.meta && Object.keys(e.meta).length) { lines.push('Meta: ' + JSON.stringify(e.meta)); }
-    lines.push('');
-  }
-  if (!debugLog.length) lines.push('(no debug log yet)');
-  downloadText(lines.join('\n'), 'plotter_studio_debug_' + new Date().toISOString().slice(0,10) + '.txt', 'text/plain');
-});
 
 // ── File attachment ───────────────────────────────────────────
 G('attach-btn').addEventListener('click',function(){G('file-input').click();});
