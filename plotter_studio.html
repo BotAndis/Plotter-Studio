@@ -2648,8 +2648,13 @@ function adjustSelectedIndexOnRemoval(removedIndex){
 }
 function loadSessionByIndex(idx){
   var sessions = loadSessions();
-  if(idx < 0 || idx >= sessions.length){
+  if(idx < 0){
     addBubble('Please select a session to load.','claude');
+    return;
+  }
+  if(idx >= sessions.length){
+    addBubble('Selected session no longer exists. Please select again.','claude','err');
+    renderSessionList();
     return;
   }
   var s = sessions[idx];
@@ -2745,9 +2750,6 @@ function renderSessionList(){
     });
     item.addEventListener('click',function(){
       setSelectedSessionIndex(idx);
-    });
-    item.addEventListener('dblclick',function(){
-      loadSessionByIndex(idx);
     });
     list.appendChild(item);
   });
