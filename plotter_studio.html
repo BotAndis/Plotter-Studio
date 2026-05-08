@@ -975,6 +975,9 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);font
   <div class="tpl-item active-tpl" data-tpl="dma" id="tpl-dma">
     <span class="tpl-dot"></span>dMA Creative Coding
   </div>
+  <div class="tpl-item" id="tpl-edit-dma-item">
+    <span class="tpl-dot"></span>Edit dMA Template…
+  </div>
   <div class="tpl-item" data-tpl="custom" id="tpl-custom-item">
     <span class="tpl-dot"></span>Custom…
   </div>
@@ -1024,7 +1027,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);font
 <div id="tpl-editor">
   <div id="tpl-editor-hdr">
     <span class="d">◆</span>
-    <span class="title">Custom Template</span>
+    <span class="title" id="tpl-editor-title">Template Editor</span>
     <button class="hbtn" id="tpl-editor-close">✕</button>
   </div>
   <div id="tpl-editor-body">
@@ -1407,6 +1410,7 @@ var stored = { title:'', desc:'', pdecode:'', p5code:'', pdeexp:'', p5exp:'' };
 var sessionTokens = { input: 0, output: 0, requests: 0 };
 var currentTemplate = 'dma'; // 'dma' | 'custom'
 var customTemplate  = { name:'Custom', body:'' };
+var editingTemplate = 'custom';
 
 function G(id){ return document.getElementById(id); }
 
@@ -1596,7 +1600,7 @@ MANDATORY OUTPUT FORMAT — always exactly these sections in this order, nothing
 Two or three sentences. What the viewer sees. Which generative system drives it. Why it works as a plotted drawing.`;
 
 // dMA template user prompt addition
-var DMA_PROMPT_ADDITION = `
+var DMA_PROMPT_DEFAULT = `
 Generate a sketch for Processing and p5.js:
 Screen: 1080, 764
 Background: White
@@ -1615,6 +1619,7 @@ Add text next to the start and end points showing the XY coordinates.
 Create a footer (16pt, same color) in the bottom right corner: "dMA Creative Coding - Lines_01" + date.
 Create a header at the top left corner counting the placed lines and showing the max lines.
 Save the lines in an array and redraw them for SVG export.`;
+var dmaTemplate = { name:'dMA Creative Coding', body:DMA_PROMPT_DEFAULT };
 
 // ── Build system prompt from settings ─────────────────────────
 function buildSysPrompt() {
@@ -2198,9 +2203,10 @@ function buildUserPrompt(task) {
   }
 
   // dMA template
+  var dmaBody = (dmaTemplate.body || '').trim() || DMA_PROMPT_DEFAULT;
   return 'Generate a plotter sketch:\n' +
     'Screen: 1080×764 | BG: White | Stroke: Black | Weight: 1 | FR: 12 | Date: ' + d + '\n' +
-    DMA_PROMPT_ADDITION + '\n\nTask: ' + task;
+    dmaBody + '\n\nTask: ' + task;
 }
 
 // ── Parse response ────────────────────────────────────────────
@@ -2670,6 +2676,7 @@ function buildSessionSnapshot(name){
     model:MODEL,
     settings:getSettings(),
     currentTemplate:currentTemplate,
+    dmaTemplate:dmaTemplate,
     customTemplate:customTemplate,
     tokens:{ input:sessionTokens.input, output:sessionTokens.output, requests:sessionTokens.requests }
   };
@@ -2811,6 +2818,7 @@ function loadSession(s){
   else sessionTokens={input:0,output:0,requests:0};
   if(s.model){MODEL=s.model; var lbl=MODEL_LABELS[s.model]||s.model; G('model-btn-label').textContent=lbl; G('cl-sub-model').textContent=lbl;}
   if(s.settings) applySettings(s.settings);
+  if(s.dmaTemplate) dmaTemplate=s.dmaTemplate;
   if(s.customTemplate) customTemplate=s.customTemplate;
   if(s.currentTemplate) setActiveTpl(s.currentTemplate);
   restorePanels(); updateThinkingBar();
@@ -2843,7 +2851,7 @@ function setActiveTpl(tpl) {
   currentTemplate = tpl;
   G('tpl-dma').classList.toggle('active-tpl', tpl === 'dma');
   G('tpl-custom-item').classList.toggle('active-tpl', tpl === 'custom');
-  var label = tpl === 'custom' ? (customTemplate.name || 'Custom') : 'dMA Creative Coding';
+  var label = tpl === 'custom' ? (customTemplate.name || 'Custom') : (dmaTemplate.name || 'dMA Creative Coding');
   G('tpl-btn').innerHTML = '⊞ ' + label + ' ▾';
   saveState();
 }
@@ -2883,13 +2891,30 @@ G('tpl-custom-item').addEventListener('click', function() {
   tplOpen = false;
   G('tpl-drop').classList.remove('open');
   G('tpl-btn').classList.remove('active');
-  openTemplateEditor();
+  openTemplateEditor('custom');
+});
+
+G('tpl-edit-dma-item').addEventListener('click', function() {
+  tplOpen = false;
+  G('tpl-drop').classList.remove('open');
+  G('tpl-btn').classList.remove('active');
+  openTemplateEditor('dma');
 });
 
 // Template editor
-function openTemplateEditor() {
-  G('tpl-name-input').value = customTemplate.name || '';
-  G('tpl-textarea').value   = customTemplate.body || '';
+function openTemplateEditor(which) {
+  editingTemplate = which === 'dma' ? 'dma' : 'custom';
+  if(editingTemplate === 'dma'){
+    G('tpl-editor-title').textContent = 'dMA Template';
+    G('tpl-name-input').value = dmaTemplate.name || 'dMA Creative Coding';
+    G('tpl-name-input').disabled = true;
+    G('tpl-textarea').value   = dmaTemplate.body || DMA_PROMPT_DEFAULT;
+  } else {
+    G('tpl-editor-title').textContent = 'Custom Template';
+    G('tpl-name-input').value = customTemplate.name || '';
+    G('tpl-name-input').disabled = false;
+    G('tpl-textarea').value   = customTemplate.body || '';
+  }
   G('tpl-editor').classList.add('open');
   G('tpl-editor-overlay').classList.add('open');
 }
@@ -2899,12 +2924,18 @@ function closeTemplateEditor() {
 }
 
 G('tpl-save-btn').addEventListener('click', function() {
-  var name = G('tpl-name-input').value.trim() || 'Custom';
   var body = G('tpl-textarea').value.trim();
-  customTemplate = { name: name, body: body };
-  setActiveTpl('custom');
+  if(editingTemplate === 'dma'){
+    dmaTemplate = { name:'dMA Creative Coding', body: body || DMA_PROMPT_DEFAULT };
+    setActiveTpl('dma');
+    addBubble('Template <strong>dMA Creative Coding</strong> saved and active.', 'claude');
+  } else {
+    var name = G('tpl-name-input').value.trim() || 'Custom';
+    customTemplate = { name: name, body: body };
+    setActiveTpl('custom');
+    addBubble('Template <strong>' + name + '</strong> saved and active.', 'claude');
+  }
   closeTemplateEditor();
-  addBubble('Template <strong>' + name + '</strong> saved and active.', 'claude');
   saveState();
 });
 G('tpl-cancel-btn').addEventListener('click', closeTemplateEditor);
@@ -3030,6 +3061,7 @@ function saveState(){
       settings: getSettings(),
       model: MODEL,
       currentTemplate: currentTemplate,
+      dmaTemplate: dmaTemplate,
       customTemplate: customTemplate
     }));
   }catch(e){console.warn('prefs save failed',e);}
@@ -3051,6 +3083,13 @@ function loadState(){
       document.querySelectorAll('.md-item').forEach(function(el){
         el.classList.toggle('active-model', el.dataset.model === s.model);
       });
+    }
+
+    if(s.dmaTemplate && typeof s.dmaTemplate === 'object'){
+      dmaTemplate = {
+        name: 'dMA Creative Coding',
+        body: typeof s.dmaTemplate.body === 'string' ? s.dmaTemplate.body : DMA_PROMPT_DEFAULT
+      };
     }
 
     if(s.customTemplate && typeof s.customTemplate === 'object'){
