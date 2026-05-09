@@ -1841,7 +1841,7 @@ function appendUserPromptToConcept(desc, task) {
   var conceptDesc = (desc || '').trim();
   var userPromptSection = '### User Prompt\n' + task;
   if (/^###\s*User Prompt\s*$/im.test(conceptDesc)) return conceptDesc;
-  conceptDesc = conceptDesc.replace(/\n*User prompt:\s*[^\n]+\s*$/i, '').trim();
+  conceptDesc = conceptDesc.replace(/(?:^|\n)User prompt:\s*[^\n]+\s*$/i, '').trim();
   if (!conceptDesc) return userPromptSection;
   return conceptDesc + '\n\n' + userPromptSection;
 }
