@@ -245,42 +245,11 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);font
 .md-section-label::before{content:'';flex:1;height:1px;background:var(--brd);display:none}
 .md-section-label.free-label{color:var(--grn);border-top-color:rgba(111,168,119,.2)}
 .md-section-label.paid-label{color:#5898b8;border-top-color:rgba(88,152,184,.2)}
-/* Accordion toggle row */
-.md-apikey-toggle{
-  display:flex;align-items:center;gap:8px;padding:9px 12px;
-  cursor:pointer;background:rgba(192,104,32,.07);
-  border-top:1px solid var(--brd);border-bottom:1px solid var(--brd);
-  font-size:9.5px;color:var(--acc);font-weight:500;letter-spacing:.04em;
-  transition:background .16s;flex-shrink:0;
-}
-.md-apikey-toggle:hover{background:rgba(192,104,32,.14)}
-.md-toggle-icon{font-size:9px;transition:transform .18s;flex-shrink:0}
-.md-toggle-icon.open{transform:rotate(90deg)}
-/* Accordion body */
-.md-accordion{display:none;flex-direction:column;overflow:hidden}
-.md-accordion.open{display:flex}
-/* API key info banner inside accordion */
-.md-key-info{padding:8px 12px;background:var(--surf3);border-bottom:1px solid var(--brd);flex-shrink:0}
-.md-key-info-row{display:flex;align-items:center;gap:6px;font-size:8.5px;margin-bottom:3px}
-.md-key-info-row:last-child{margin-bottom:0}
-.md-key-prov{color:var(--txdim);font-size:8px;letter-spacing:.1em;text-transform:uppercase;width:70px;flex-shrink:0}
-.md-key-info a{color:var(--acc);text-decoration:none;font-size:8.5px}
-.md-key-info a:hover{text-decoration:underline}
 /* Tags — now multiple per item */
 .md-tags{display:flex;gap:3px;flex-wrap:wrap;flex-shrink:0}
 .tag-free{background:rgba(111,168,119,.18);color:var(--grn);border:1px solid rgba(111,168,119,.3)}
 .tag-paid{background:rgba(88,152,184,.12);color:#5898b8}
 
-/* ── CORS PROXY ROW ── */
-.md-cors-row{display:flex;align-items:center;gap:5px;padding:5px 12px 6px;background:rgba(192,104,32,.05);border-top:1px solid var(--brd)}
-.md-cors-label{font-size:7.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--txdim);flex-shrink:0;white-space:nowrap}
-.md-cors-input{flex:1;background:var(--bg);border:1px solid var(--brd);border-radius:3px;color:var(--txt);font-family:var(--font);font-size:8px;padding:4px 6px;outline:none;min-width:0}
-.md-cors-input:focus{border-color:var(--acc)}
-.md-cors-input.active{border-color:var(--grn);color:var(--grn)}
-.md-cors-btn{padding:0 7px;height:22px;background:var(--acc);color:#fff;border:none;border-radius:3px;font-family:var(--font);font-size:7.5px;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;flex-shrink:0}
-.md-cors-btn:hover{background:var(--acchi)}
-.md-cors-clear{background:none;border:1px solid var(--brd);color:var(--txdim)}
-.md-cors-clear:hover{background:rgba(200,60,60,.12);border-color:rgba(200,60,60,.4);color:#c44}
 /* ── PROVIDER SUB-ACCORDIONS ── */
 .md-prov-toggle{display:flex;align-items:center;gap:7px;padding:7px 12px;cursor:pointer;background:var(--surf3);border-top:1px solid var(--brd);font-size:8.5px;color:var(--txt);letter-spacing:.14em;text-transform:uppercase;transition:background .14s;flex-shrink:0;user-select:none;font-weight:500}
 .md-prov-toggle:hover{background:var(--surf2)}
@@ -288,7 +257,6 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);font
 .md-ptog-icon.open{transform:rotate(90deg)}
 .md-prov-body{display:none;flex-direction:column}
 .md-prov-body.open{display:flex}
-.md-prov-toggle .key-sdot{margin-left:auto}
 /* ── THINKING BAR ── */
 #thinking-bar{padding:5px 10px;border-bottom:1px solid var(--brd);display:none;align-items:center;gap:8px;flex-shrink:0;background:rgba(192,104,32,.05);}
 #thinking-bar.visible{display:flex}
