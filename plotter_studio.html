@@ -590,6 +590,14 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);font
 #dbg-header{height:36px;background:var(--surf2);border-bottom:1px solid var(--brd);display:flex;align-items:center;justify-content:space-between;padding:0 14px;font-size:8.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--txdim);flex-shrink:0}
 #dbg-header button{background:var(--surf3);border:1px solid var(--brd);color:var(--txt);width:28px;height:28px;border-radius:3px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;z-index:9600;position:relative}
 #dbg-header button:hover{border-color:var(--acc);color:var(--acc)}
+#dbg-flow{border-bottom:1px solid var(--brd);padding:10px 12px 11px;background:var(--surf)}
+.dbg-flow-row{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+.dbg-flow-node{display:flex;align-items:center;gap:5px;border:1px solid var(--brd);border-radius:999px;padding:2px 8px;font-size:7px;letter-spacing:.12em;text-transform:uppercase;color:var(--txdim);background:var(--surf2)}
+.dbg-flow-node .f-dot{width:6px;height:6px;border-radius:50%;background:var(--txlo)}
+.dbg-flow-node.active{border-color:var(--acc);color:var(--acc);background:rgba(199,110,34,.1)}
+.dbg-flow-node.active .f-dot{background:var(--acc);animation:vp-pulse 1s ease-in-out infinite}
+.dbg-flow-arrow{font-size:8px;color:var(--txlo)}
+.dbg-flow-detail{margin-top:6px;font-size:7px;letter-spacing:.1em;color:var(--txlo);text-transform:uppercase}
 #dbg-log{flex:1;overflow-y:auto;padding:14px;font-family:var(--font);font-size:10px;line-height:1.6;color:var(--txt)}
 .dbg-entry{margin-bottom:16px;border:1px solid var(--brd);border-radius:6px;overflow:hidden}
 .dbg-entry-hdr{padding:6px 10px;background:var(--surf3);font-size:7.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--txdim);display:flex;justify-content:space-between;align-items:center}
@@ -1398,6 +1406,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);font
     <span>API Debug Log</span>
     <button id="dbg-close">✕</button>
   </div>
+  <div id="dbg-flow"></div>
   <div id="dbg-log"></div>
 </div>
 
@@ -1779,6 +1788,21 @@ var PIPELINE_ENABLED = true; // can be toggled in settings
 // Phase display names
 var PHASE_LABELS = { concept:'Concept', p5:'p5.js Preview', pde:'Processing Code', explain:'Explanations' };
 
+function getGenerationPlan(s) {
+  var cfg = s || getSettings();
+  var phases = ['concept'];
+  if (cfg.p5) phases.push('p5');
+  if (cfg.pde) phases.push('pde');
+  if ((cfg.pde && cfg.pdeExp) || (cfg.p5 && cfg.p5Exp)) phases.push('explain');
+  var hasCode = !!(cfg.p5 || cfg.pde);
+  return {
+    settings: cfg,
+    phases: phases,
+    hasCode: hasCode,
+    usePipeline: PIPELINE_ENABLED && hasCode && phases.length >= 2
+  };
+}
+
 function initVeilPhases(phases) {
   var el = G('veil-phases');
   el.innerHTML = '';
@@ -1798,16 +1822,12 @@ function setVeilPhase(phase, state, detail) {
   if (detail !== undefined) G('veil-detail').textContent = detail;
 }
 
-async function generatePipeline(task, attachments) {
-  var s = getSettings();
-  var phases = [];
+async function generatePipeline(task, attachments, plan) {
+  var resolvedPlan = plan || getGenerationPlan();
+  var s = resolvedPlan.settings;
+  var phases = resolvedPlan.phases.slice();
 
-  phases.push('concept');
-  if (s.p5) phases.push('p5');
-  if (s.pde) phases.push('pde');
-  if ((s.pde && s.pdeExp) || (s.p5 && s.p5Exp)) phases.push('explain');
-
-  if (phases.length <= 2 || !PIPELINE_ENABLED) {
+  if (phases.length <= 1 || !PIPELINE_ENABLED) {
     G('veil-phases').innerHTML = '';
     G('veil-detail').textContent = '';
     return await callClaude(task, attachments);
@@ -1829,6 +1849,7 @@ async function generatePipeline(task, attachments) {
   setStatus('run', 'phase 1/' + phases.length + ' — concept…');
   try {
     var conceptResult = await callPhase('concept', base, attachments, provider, s);
+    setDbgFlow('parse', 'Parsing concept output', 'concept');
     var conceptParsed = parseResponse(conceptResult.text);
     result.title = conceptParsed.title;
     result.desc = conceptParsed.desc;
@@ -1873,6 +1894,7 @@ async function generatePipeline(task, attachments) {
         p5prompt = 'Implement this concept as a p5.js sketch:\n\n' + conceptContext + '\n\nUser request: ' + task;
       }
       var p5Result = await callPhase('p5', p5prompt, null, provider, s);
+      setDbgFlow('parse', 'Parsing p5 output', 'p5');
       var p5Parsed = parseResponse(p5Result.text);
       result.p5code = p5Parsed.p5code;
       result.actualModel = p5Result.model;
@@ -1891,6 +1913,7 @@ async function generatePipeline(task, attachments) {
           try {
             var fixPrompt = 'The following p5.js sketch has a runtime error:\n\nError: ' + p5err + '\n\nOriginal code:\n```\n' + result.p5code + '\n```\n\nFix the error and return the corrected sketch. NEVER use document.getElementById(), document.querySelector(), p.select(), appendChild, or any direct DOM access. Use ONLY p5 instance methods (p.createButton, p.createSlider, p.createDiv, etc.). Store slider references in variables and read with .value() — never use p.slider() or p.this.\n\nUser request: ' + task;
             var fixResult = await callPhase('p5', fixPrompt, null, provider, s);
+            setDbgFlow('parse', 'Parsing p5 auto-fix output', 'p5');
             var fixParsed = parseResponse(fixResult.text);
             if (fixParsed.p5code) {
               result.p5code = fixParsed.p5code;
@@ -1937,6 +1960,7 @@ async function generatePipeline(task, attachments) {
         pdePrompt = 'Implement this concept as a Processing Java sketch:\n\n' + conceptContext + '\n\nUser request: ' + task;
       }
       var pdeResult = await callPhase('pde', pdePrompt, null, provider, s);
+      setDbgFlow('parse', 'Parsing Processing output', 'pde');
       var pdeParsed = parseResponse(pdeResult.text);
       result.pdecode = pdeParsed.pdecode;
       setVeilPhase('pde', 'done', '✓ Processing code generated');
@@ -1961,6 +1985,7 @@ async function generatePipeline(task, attachments) {
       if (result.pdecode) codeCtx += '\n\nProcessing code:\n```\n' + result.pdecode.substring(0, 800) + '\n```';
       var expPrompt = 'Write explanations for this sketch:\n\n' + conceptContext + codeCtx;
       var expResult = await callPhase('explain', expPrompt, null, provider, s);
+      setDbgFlow('parse', 'Parsing explanation output', 'explain');
       var expParsed = parseResponse(expResult.text);
       result.pdeexp = expParsed.pdeexp;
       result.p5exp = expParsed.p5exp;
@@ -1985,6 +2010,7 @@ async function generatePipeline(task, attachments) {
   if (result.p5exp) combinedOutput += '### How it works (p5.js)\n' + result.p5exp + '\n\n';
   if (result.pdeexp) combinedOutput += '### How it works (Processing)\n' + result.pdeexp + '\n\n';
   if (combinedOutput) {
+    setDbgFlow('history', 'Saving follow-up context', 'history');
     chatHistory.push({ role: 'user', content: base });
     chatHistory.push({ role: 'assistant', content: combinedOutput });
   }
@@ -1995,6 +2021,35 @@ async function generatePipeline(task, attachments) {
 // ── Debug log ─────────────────────────────────────────────────
 var debugLog = [];
 var dbgGeneration = 0;
+var DBG_FLOW_NODES = [
+  { id:'input', label:'Input' },
+  { id:'plan', label:'Plan' },
+  { id:'request', label:'Request' },
+  { id:'response', label:'Response' },
+  { id:'parse', label:'Parse' },
+  { id:'render', label:'Render' },
+  { id:'history', label:'History' }
+];
+var dbgFlowState = { node:'input', detail:'Waiting for prompt', phase:'idle' };
+function setDbgFlow(node, detail, phase) {
+  dbgFlowState.node = node || dbgFlowState.node;
+  if (detail !== undefined) dbgFlowState.detail = detail;
+  if (phase !== undefined) dbgFlowState.phase = phase;
+  renderDbgFlow();
+}
+function renderDbgFlow() {
+  var el = G('dbg-flow');
+  if (!el) return;
+  var parts = ['<div class="dbg-flow-row">'];
+  for (var i = 0; i < DBG_FLOW_NODES.length; i++) {
+    if (i > 0) parts.push('<span class="dbg-flow-arrow">→</span>');
+    var n = DBG_FLOW_NODES[i];
+    parts.push('<span class="dbg-flow-node' + (dbgFlowState.node === n.id ? ' active' : '') + '"><span class="f-dot"></span>' + n.label + '</span>');
+  }
+  parts.push('</div>');
+  parts.push('<div class="dbg-flow-detail">Phase: ' + escHtml((dbgFlowState.phase || 'idle') + ' · ' + (dbgFlowState.detail || '')) + '</div>');
+  el.innerHTML = parts.join('');
+}
 function dbgAdd(phase, direction, content, meta) {
   debugLog.push({ gen: dbgGeneration, phase: phase, dir: direction, content: content, meta: meta || {}, time: new Date() });
   renderDbgLog();
@@ -2002,6 +2057,7 @@ function dbgAdd(phase, direction, content, meta) {
 function dbgNewGeneration() {
   dbgGeneration++;
   debugLog.push({ gen: dbgGeneration, separator: true, time: new Date() });
+  setDbgFlow('input', 'Generation #' + dbgGeneration + ' started', 'start');
   renderDbgLog();
   G('dbg-toggle').classList.add('has-log');
 }
@@ -2051,6 +2107,7 @@ async function callPhase(phase, userMsg, attachments, provider, s) {
   var maxTokens = phase === 'concept' ? 1500 : phase === 'explain' ? 3000 : 8000;
   // Concept phase includes chat history for follow-up context
   var history = (phase === 'concept' && chatHistory.length > 0) ? chatHistory.slice() : [];
+  setDbgFlow('request', 'Calling ' + phase + ' phase', phase);
   dbgAdd(phase, 'system prompt', sysPrompt, { model: MODEL, provider: provider, maxTokens: maxTokens, historyTurns: history.length });
   dbgAdd(phase, 'user message', userMsg);
 
@@ -2062,6 +2119,7 @@ async function callPhase(phase, userMsg, attachments, provider, s) {
   } else {
     result = await callPhaseAnthropic(sysPrompt, userMsg, attachments, maxTokens, history);
   }
+  setDbgFlow('response', 'Received ' + phase + ' response', phase);
   dbgAdd(phase, 'response', result.text, { model: result.model });
   return result;
 }
@@ -2304,6 +2362,7 @@ async function callAcademicCloud(task, base, attachments) {
 
   chatHistory.push({ role: 'user', content: userContent });
 
+  setDbgFlow('request', 'Calling Academic Cloud API', 'single-shot');
   var res = await fetch(ACADEMIC_URL, {
     method: 'POST',
     headers: {
@@ -2336,10 +2395,13 @@ async function callAcademicCloud(task, base, attachments) {
   // Strip <think>…</think> reasoning blocks (DeepSeek R1, Qwen etc.)
   raw = raw.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
 
+  setDbgFlow('response', 'Received Academic Cloud response', 'single-shot');
   chatHistory.push({ role: 'assistant', content: raw });
   if (data.usage) { sessionTokens.input += (data.usage.prompt_tokens||0); sessionTokens.output += (data.usage.completion_tokens||0); sessionTokens.requests++; }
   dbgAdd('legacy', 'response (academic)', raw, { model: data.model || MODEL });
+  setDbgFlow('parse', 'Parsing Academic Cloud response', 'single-shot');
   var parsed = parseResponse(raw);
+  setDbgFlow('history', 'Updated chat history', 'single-shot');
   parsed.actualModel = data.model || MODEL;
   parsed.requestedModel = MODEL;
   return parsed;
@@ -2377,6 +2439,7 @@ async function callAnthropic(task, base, attachments) {
     body.thinking = { type: 'enabled', budget_tokens: thinkingBudget };
     body.max_tokens = Math.max(9000, thinkingBudget + 4000); // ensure headroom
   }
+  setDbgFlow('request', 'Calling Anthropic API', 'single-shot');
   dbgAdd('legacy','→ request',JSON.stringify(body,null,2),{provider:'anthropic',model:MODEL});
   var res=await fetch('https://api.anthropic.com/v1/messages',{
     method:'POST',headers:hdrs,
@@ -2388,10 +2451,13 @@ async function callAnthropic(task, base, attachments) {
   }
   var data=await res.json();
   var raw=(data.content||[]).map(function(b){return b.text||'';}).join('');
+  setDbgFlow('response', 'Received Anthropic response', 'single-shot');
   dbgAdd('legacy','← response',raw,{provider:'anthropic',model:data.model||MODEL,usage:data.usage});
   if (data.usage) { sessionTokens.input += (data.usage.input_tokens||0); sessionTokens.output += (data.usage.output_tokens||0); sessionTokens.requests++; }
   chatHistory.push({role:'assistant',content:raw});
+  setDbgFlow('parse', 'Parsing Anthropic response', 'single-shot');
   var parsed = parseResponse(raw);
+  setDbgFlow('history', 'Updated chat history', 'single-shot');
   parsed.actualModel = data.model || '(unknown)';
   parsed.requestedModel = MODEL;
   return parsed;
@@ -2460,6 +2526,7 @@ async function callGemini(task, base, attachments) {
     generationConfig: { maxOutputTokens: 9000, temperature: 1.0 }
   };
 
+  setDbgFlow('request', 'Calling Gemini API', 'single-shot');
   dbgAdd('legacy','→ request',JSON.stringify(body,null,2),{provider:'gemini',model:MODEL});
   var res = await fetch(url, {
     method: 'POST',
@@ -2485,10 +2552,13 @@ async function callGemini(task, base, attachments) {
     throw new Error('Gemini returned no text (finishReason: ' + reason + ')');
   }
 
+  setDbgFlow('response', 'Received Gemini response', 'single-shot');
   dbgAdd('legacy','← response',raw,{provider:'gemini',model:data.modelVersion||MODEL,usage:data.usageMetadata});
   if (data.usageMetadata) { sessionTokens.input += (data.usageMetadata.promptTokenCount||0); sessionTokens.output += (data.usageMetadata.candidatesTokenCount||0); sessionTokens.requests++; }
   chatHistory.push({ role: 'assistant', content: raw });
+  setDbgFlow('parse', 'Parsing Gemini response', 'single-shot');
   var parsed = parseResponse(raw);
+  setDbgFlow('history', 'Updated chat history', 'single-shot');
   parsed.actualModel = data.modelVersion || MODEL;
   parsed.requestedModel = MODEL;
   return parsed;
@@ -3321,6 +3391,7 @@ async function send(){
   var inp=G('cin'),text=inp.value.trim();if(!text)return;
   inp.value='';
   var attachments=pendingFiles.filter(Boolean);pendingFiles=[];G('attach-chips').innerHTML='';
+  setDbgFlow('input', 'Prompt received', 'send');
   addBubble(text+(attachments.length?' [+'+attachments.length+' file(s)]':''),'user');
   dbgNewGeneration();
   setTyping(true);setStatus('run','generating…');setVeil(true);
@@ -3332,14 +3403,17 @@ async function send(){
   G('howto-pde').style.display='none';G('howto-p5').style.display='none';G('how-ph').style.display='flex';
   G('csend').disabled=true;
   try{
+    var plan = getGenerationPlan(getSettings());
+    if (!plan.hasCode) throw new Error('Enable at least one code target (Processing and/or p5.js) in settings.');
+    setDbgFlow('plan', 'Pipeline ' + (plan.usePipeline ? 'on' : 'off') + ' · ' + plan.phases.join(' → '), 'plan');
+
     var r;
-    var s = getSettings();
-    var phaseCount = 1 + (s.p5?1:0) + (s.pde?1:0) + ((s.pde&&s.pdeExp)||(s.p5&&s.p5Exp)?1:0);
-    if (PIPELINE_ENABLED && phaseCount >= 3) {
-      r = await generatePipeline(text, attachments);
+    if (plan.usePipeline) {
+      r = await generatePipeline(text, attachments, plan);
     } else {
       r = await callClaude(text, attachments);
     }
+    setDbgFlow('render', 'Updating UI panels', 'render');
     renderAll(r);
 
     // Auto-fix for single-shot mode — use focused p5 phase caller, not full callClaude
@@ -3360,8 +3434,8 @@ async function send(){
 
     // Verify: was the requested model actually used?
     var match = r.actualModel && r.actualModel.indexOf(r.requestedModel.replace(/-\d{8}$/, '')) > -1;
-    var pipelineNote = (PIPELINE_ENABLED && phaseCount >= 3)
-      ? '<br><span style="color:var(--txdim)">⚡ Generated in ' + phaseCount + ' focused phases</span>'
+    var pipelineNote = plan.usePipeline
+      ? '<br><span style="color:var(--txdim)">⚡ Generated in ' + plan.phases.length + ' focused phases</span>'
       : '';
     var modelLine = match
       ? '✓ Model used: <strong style="color:var(--grn)">' + r.actualModel + '</strong>'
@@ -3374,8 +3448,10 @@ async function send(){
       '<button class="dl-btn" onclick="triggerHtmlDownload()">↓ .html</button>',
       'claude'
     );
+    setDbgFlow('history', 'Generation complete', 'done');
     setStatus('ok','ready');
   }catch(e){
+    setDbgFlow('response', 'Error: ' + e.message, 'error');
     console.error(e);addBubble('Error: '+e.message,'claude','err');setStatus('err','error');
   }finally{
     setTyping(false);setVeil(false);G('csend').disabled=false;
@@ -4155,6 +4231,7 @@ try{
 
 loadState();
 initApiKeyUI();
+renderDbgFlow();
 
 // ── Expose functions needed by inline HTML handlers ──────────
 window.switchNav = switchNav;
