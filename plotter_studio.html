@@ -1840,7 +1840,7 @@ function setVeilPhase(phase, state, detail) {
 function appendUserPromptToConcept(desc, task) {
   var conceptDesc = (desc || '').trim();
   var userPromptLine = 'User prompt: ' + task;
-  if (conceptDesc.indexOf('User prompt:') > -1) return conceptDesc;
+  if (/\nUser prompt:\s*[^\n]+$/m.test(conceptDesc) || /^User prompt:\s*[^\n]+$/m.test(conceptDesc)) return conceptDesc;
   if (!conceptDesc) return userPromptLine;
   return conceptDesc + '\n\n' + userPromptLine;
 }
@@ -3531,7 +3531,7 @@ async function send(){
   G('csend').disabled=true;
   try{
     var plan = getGenerationPlan(getSettings());
-    if (!plan.hasCode) throw new Error('Enable at least one code target (Processing and/or p5.js) in settings.');
+    if (!plan.hasCode) throw new Error('Enable at least one code target (Processing or p5.js) in settings.');
     setDbgFlow('plan', 'Pipeline ' + (plan.usePipeline ? 'on' : 'off') + ' · ' + plan.phases.join(' → '), 'plan');
 
     var r;
