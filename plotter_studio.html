@@ -532,20 +532,44 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);font
 #tpl-editor-hdr .d{color:var(--acc);font-size:8px}
 #tpl-editor-hdr .title{font-size:9px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--txhi);flex:1}
 #tpl-editor-body{flex:1;overflow:auto;padding:16px;display:flex;flex-direction:column;gap:12px;min-height:0}
-.tpl-field-label{font-size:8px;letter-spacing:.2em;text-transform:uppercase;color:var(--txdim);margin-bottom:5px}
-#tpl-name-input{
-  width:100%;background:var(--bg);border:1px solid var(--brd);border-radius:3px;
-  color:var(--txhi);font-family:var(--font);font-size:10.5px;padding:7px 10px;
-  outline:none;transition:border-color .2s;
+.tpl-prompt-card{
+  border:1px solid var(--brd);
+  border-radius:6px;
+  background:var(--surf2);
+  overflow:hidden;
 }
-#tpl-name-input:focus{border-color:var(--acc)}
-#tpl-textarea{
-  width:100%;flex:1;min-height:260px;
+.tpl-prompt-summary{
+  display:flex;align-items:center;gap:8px;
+  padding:8px 10px;cursor:pointer;list-style:none;
+}
+.tpl-prompt-summary::-webkit-details-marker{display:none}
+.tpl-prompt-title{
+  flex:1;
+  font-size:8.5px;
+  letter-spacing:.12em;
+  text-transform:uppercase;
+  color:var(--txhi);
+}
+.tpl-base-tag{
+  display:inline-flex;align-items:center;
+  margin-left:6px;padding:1px 5px;
+  border:1px solid var(--acc);border-radius:3px;
+  color:var(--acc);font-size:7px;letter-spacing:.12em;text-transform:uppercase;
+}
+.tpl-model-select{
+  min-width:150px;max-width:220px;
+  background:var(--bg);border:1px solid var(--brd);
+  border-radius:3px;color:var(--txt);
+  font-family:var(--font);font-size:9px;padding:4px 6px;
+}
+.tpl-prompt-body{padding:10px;border-top:1px solid var(--brd);background:var(--surf)}
+.tpl-prompt-textarea{
+  width:100%;min-height:150px;
   background:var(--bg);border:1px solid var(--brd);border-radius:3px;
   color:var(--txt);font-family:var(--font);font-size:10px;line-height:1.7;
   padding:10px 12px;resize:vertical;outline:none;transition:border-color .2s;
 }
-#tpl-textarea:focus{border-color:var(--acc)}
+.tpl-prompt-textarea:focus{border-color:var(--acc)}
 .tpl-hint{font-size:8.5px;letter-spacing:.06em;color:var(--txdim);line-height:1.65;padding:8px 10px;background:var(--surf3);border-radius:3px;border-left:2px solid var(--acc)}
 #tpl-editor-foot{
   padding:12px 16px;border-top:1px solid var(--brd);
@@ -558,6 +582,11 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);font
 }
 #tpl-save-btn{background:var(--acc);color:#fff}
 #tpl-save-btn:hover{background:var(--acchi)}
+#tpl-save-top-btn{
+  height:26px;padding:0 12px;background:var(--acc);color:#fff;
+  border:none;border-radius:4px;font-size:8px;letter-spacing:.14em;text-transform:uppercase;
+}
+#tpl-save-top-btn:hover{background:var(--acchi)}
 #tpl-cancel-btn{background:none;border:1px solid var(--brd);color:var(--txdim)}
 #tpl-cancel-btn:hover{border-color:var(--acc);color:var(--acc)}
 #tpl-editor-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9250;display:none}
@@ -985,10 +1014,10 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);font
     <span class="tpl-dot"></span>dMA Creative Coding
   </div>
   <div class="tpl-item" id="tpl-edit-dma-item">
-    <span class="tpl-dot"></span>Edit dMA Template…
+    <span class="tpl-dot"></span>Edit Prompt Templates…
   </div>
   <div class="tpl-item" data-tpl="custom" id="tpl-custom-item">
-    <span class="tpl-dot"></span>Custom…
+    <span class="tpl-dot"></span>Custom + Prompt Templates…
   </div>
 </div>
 
@@ -1036,27 +1065,20 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);font
 <div id="tpl-editor">
   <div id="tpl-editor-hdr">
     <span class="d">◆</span>
-    <span class="title" id="tpl-editor-title">Template Editor</span>
+    <span class="title" id="tpl-editor-title">Prompt Templates</span>
+    <button class="tpl-foot-btn" id="tpl-save-top-btn">Save</button>
     <button class="hbtn" id="tpl-editor-close">✕</button>
   </div>
   <div id="tpl-editor-body">
-    <div>
-      <div class="tpl-field-label">Template Name</div>
-      <input id="tpl-name-input" type="text" placeholder="e.g. My Studio Setup">
-    </div>
-    <div style="flex:1;display:flex;flex-direction:column">
-      <div class="tpl-field-label">System Prompt / Template</div>
-      <textarea id="tpl-textarea" placeholder="Write your full system prompt here. Use [TASK] as a placeholder for the user's sketch description."></textarea>
-    </div>
     <div class="tpl-hint">
-      Use <strong>[TASK]</strong> where the user's sketch description should be inserted.<br>
-      The template replaces the full system prompt — include all instructions you need.<br>
-      Leave blank to reset to the built-in default.
+      Each prompt can be edited. Keep the <strong>Base</strong> template as your main customization in most cases.<br>
+      Use <strong>[TASK]</strong> where the user's sketch description should be inserted.
     </div>
+    <div id="tpl-prompt-list"></div>
   </div>
   <div id="tpl-editor-foot">
-    <button class="tpl-foot-btn" id="tpl-cancel-btn">Cancel</button>
-    <button class="tpl-foot-btn" id="tpl-save-btn">Save &amp; Use</button>
+    <button class="tpl-foot-btn" id="tpl-cancel-btn">Close</button>
+    <button class="tpl-foot-btn" id="tpl-save-btn">Save</button>
   </div>
 </div>
 
@@ -1436,6 +1458,8 @@ var sessionTokens = { input: 0, output: 0, requests: 0 };
 var currentTemplate = 'dma'; // 'dma' | 'custom'
 var customTemplate  = { name:'Custom', body:'' };
 var editingTemplate = 'custom';
+var promptTemplates = { system:'', concept:'', p5:'', pde:'', explain:'' };
+var promptRequestModels = { single:'', concept:'', p5:'', pde:'', explain:'' };
 
 function G(id){ return document.getElementById(id); }
 
@@ -1623,6 +1647,18 @@ MANDATORY OUTPUT FORMAT — always exactly these sections in this order, nothing
 
 ### [Concept Title]
 Two or three sentences. What the viewer sees. Which generative system drives it. Why it works as a plotted drawing.`;
+var DEFAULT_BASE_SYSTEM_PROMPT = BASE_SYSTEM_PROMPT;
+
+function getSystemPromptText() {
+  return (promptTemplates.system && promptTemplates.system.trim()) || DEFAULT_BASE_SYSTEM_PROMPT;
+}
+function getPromptOverride(key) {
+  return (promptTemplates[key] && promptTemplates[key].trim()) || '';
+}
+function getRequestModel(requestKey) {
+  var chosen = promptRequestModels[requestKey];
+  return chosen && typeof chosen === 'string' ? chosen : MODEL;
+}
 
 // dMA template user prompt addition
 var DMA_PROMPT_DEFAULT = `
@@ -1649,7 +1685,7 @@ var dmaTemplate = { name:'dMA Creative Coding', body:DMA_PROMPT_DEFAULT };
 // ── Build system prompt from settings ─────────────────────────
 function buildSysPrompt() {
   var s = getSettings();
-  var sys = BASE_SYSTEM_PROMPT + '\n\n';
+  var sys = getSystemPromptText() + '\n\n';
 
   if (s.pde) {
     sys += `### Processing code
@@ -1709,14 +1745,18 @@ Same structure as Processing explanation but specific to p5.js:
 // ── Phase-specific system prompts for multi-step pipeline ─────
 function buildPhasePrompt(phase, s) {
   if (!s) s = getSettings();
-  var sys = BASE_SYSTEM_PROMPT + '\n\n';
+  var sys = getSystemPromptText() + '\n\n';
 
   if (phase === 'concept') {
+    var conceptOverride = getPromptOverride('concept');
+    if (conceptOverride) return sys + conceptOverride;
     sys += 'OUTPUT: Generate ONLY a concept. Return exactly:\n### [Concept Title]\nTwo or three sentences describing what the viewer sees, which generative system drives it, and why it works as a plotted drawing.\n\nThen append one final line exactly in this format:\nUser prompt: <the user request>\n\nCRITICAL: Do NOT output any code (no Processing, no p5.js, no Java, no JavaScript). Do NOT include ```code blocks```. ONLY return the ### title, 2-3 sentence description, and final User prompt line. Nothing else.\n\nIf this is a follow-up request that modifies a previous sketch, describe how the concept evolves — what was there before and what changes.';
     return sys;
   }
 
   if (phase === 'p5') {
+    var p5Override = getPromptOverride('p5');
+    if (p5Override) return sys + p5Override;
     var ctrlRules = [];
     if (s.textBtn)     ctrlRules.push('Add a p.createButton("Text: On / Off") that toggles all canvas text and redraws.');
     if (s.lineTextBtn) ctrlRules.push('Add a p.createButton("Line Labels: On / Off") that toggles XY coordinate labels at line endpoints and redraws.');
@@ -1733,6 +1773,8 @@ function buildPhasePrompt(phase, s) {
   }
 
   if (phase === 'pde') {
+    var pdeOverride = getPromptOverride('pde');
+    if (pdeOverride) return sys + pdeOverride;
     sys += "OUTPUT: Return exactly this structure:\n### Processing code\n```processing\n...\n```\n\nProcessing Java sketch in a ```processing block.\n" +
       "Requirements:\n" +
       "- import processing.svg.*; (and processing.pdf.*; when useful)\n" +
@@ -1751,6 +1793,8 @@ function buildPhasePrompt(phase, s) {
   }
 
   if (phase === 'explain') {
+    var explainOverride = getPromptOverride('explain');
+    if (explainOverride) return sys + explainOverride;
     var parts = [];
     if (s.pde && s.pdeExp) {
       parts.push("### How it works (Processing)\nPlain-language guide. **System:** **Parameters:** **SHOW_TEXT:** **Export:** **Tips:**");
@@ -1905,9 +1949,8 @@ async function generatePipeline(task, attachments, plan) {
   initVeilPhases(phases);
   G('veil-title').textContent = 'Generating Sketch';
 
-  var result = { title:'', desc:'', pdecode:'', pdeexp:'', p5code:'', p5exp:'', actualModel:'', requestedModel: MODEL };
+  var result = { title:'', desc:'', pdecode:'', pdeexp:'', p5code:'', p5exp:'', actualModel:'', requestedModel: '' };
   var base = buildUserPrompt(task);
-  var provider = providerFor(MODEL);
   var errors = [];
 
   trimHistory();
@@ -1916,13 +1959,14 @@ async function generatePipeline(task, attachments, plan) {
   setVeilPhase('concept', 'active', 'Generating concept and title…');
   setStatus('run', 'phase 1/' + phases.length + ' — concept…');
   try {
-    var conceptResult = await callPhase('concept', base, attachments, provider, s);
+    var conceptModel = getRequestModel('concept');
+    var conceptResult = await callPhase('concept', base, attachments, conceptModel, s);
     setDbgFlow('parse', 'Parsing concept output', 'concept');
     var conceptParsed = parseResponse(conceptResult.text);
     result.title = conceptParsed.title;
     result.desc = appendUserPromptToConcept(conceptParsed.desc, task);
     result.actualModel = conceptResult.model;
-    result.requestedModel = MODEL;
+    result.requestedModel = conceptModel;
     setVeilPhase('concept', 'done', '✓ Concept: ' + (result.title || 'done'));
 
     if (result.title) {
@@ -1961,11 +2005,13 @@ async function generatePipeline(task, attachments, plan) {
       } else {
         p5prompt = 'Implement this concept as a p5.js sketch:\n\n' + conceptContext + '\n\nUser request: ' + task;
       }
-      var p5Result = await callPhase('p5', p5prompt, null, provider, s);
+      var p5Model = getRequestModel('p5');
+      var p5Result = await callPhase('p5', p5prompt, null, p5Model, s);
       setDbgFlow('parse', 'Parsing p5 output', 'p5');
       var p5Parsed = parseResponse(p5Result.text);
       result.p5code = p5Parsed.p5code;
       result.actualModel = p5Result.model;
+      result.requestedModel = p5Model;
       setVeilPhase('p5', 'done', '✓ p5.js preview generated');
 
       if (result.p5code) {
@@ -1980,7 +2026,7 @@ async function generatePipeline(task, attachments, plan) {
           setStatus('run', 'phase ' + (phases.indexOf('p5fix') + 1) + '/' + phases.length + ' — p5.js bug-fix…');
           try {
             var fixPrompt = 'The following p5.js sketch has a SYNTAX error.\n\nError: ' + p5err + '\n\nOriginal code:\n```p5instance\n' + result.p5code + '\n```\n\nSTRICT TASK: Fix only syntax errors. Do not redesign, refactor, or change behavior beyond what is required to make syntax valid. Return only the corrected complete p5.js sketch in ### p5 sketch format.\n\nUser request: ' + task;
-            var fixResult = await callPhase('p5', fixPrompt, null, provider, s);
+            var fixResult = await callPhase('p5', fixPrompt, null, p5Model, s);
             setDbgFlow('parse', 'Parsing p5 auto-fix output', 'p5');
             var fixParsed = parseResponse(fixResult.text);
             if (fixParsed.p5code) {
@@ -2025,10 +2071,13 @@ async function generatePipeline(task, attachments, plan) {
         pde: false, pdeExp: false,
         p5: true, p5Exp: true
       };
-      var p5ExpResult = await callPhase('explain', p5ExpPrompt, null, provider, p5ExplainSettings);
+      var explainModel = getRequestModel('explain');
+      var p5ExpResult = await callPhase('explain', p5ExpPrompt, null, explainModel, p5ExplainSettings);
       setDbgFlow('parse', 'Parsing p5 explanation output', 'p5exp');
       var p5ExpParsed = parseResponse(p5ExpResult.text);
       result.p5exp = p5ExpParsed.p5exp;
+      result.actualModel = p5ExpResult.model;
+      result.requestedModel = explainModel;
       setVeilPhase('p5exp', 'done', '✓ p5.js explanation ready');
     } catch (e) {
       console.error('Pipeline p5 explanation phase failed:', e);
@@ -2057,10 +2106,13 @@ async function generatePipeline(task, attachments, plan) {
       if (result.p5code) {
         pdePrompt += '\n\nReference p5.js preview code for geometry/structure consistency:\n```p5instance\n' + result.p5code.substring(0, 1200) + '\n```';
       }
-      var pdeResult = await callPhase('pde', pdePrompt, null, provider, s);
+      var pdeModel = getRequestModel('pde');
+      var pdeResult = await callPhase('pde', pdePrompt, null, pdeModel, s);
       setDbgFlow('parse', 'Parsing Processing output', 'pde');
       var pdeParsed = parseResponse(pdeResult.text);
       result.pdecode = pdeParsed.pdecode;
+      result.actualModel = pdeResult.model;
+      result.requestedModel = pdeModel;
       setVeilPhase('pde', 'done', '✓ Processing code generated');
 
       if (result.pdecode) {
@@ -2075,7 +2127,7 @@ async function generatePipeline(task, attachments, plan) {
           try {
             var pdeFixPrompt = 'The following Processing sketch has likely syntax errors:\n- ' + syntaxIssues.join('\n- ') +
               '\n\nOriginal code:\n```processing\n' + result.pdecode + '\n```\n\nSTRICT TASK: Fix only syntax errors. Do not redesign or alter visual behavior unless required by syntax validity. Return only the corrected complete Processing code in ### Processing code format.';
-            var pdeFixResult = await callPhase('pde', pdeFixPrompt, null, provider, s);
+            var pdeFixResult = await callPhase('pde', pdeFixPrompt, null, pdeModel, s);
             setDbgFlow('parse', 'Parsing Processing bug-fix output', 'pdefix');
             var pdeFixParsed = parseResponse(pdeFixResult.text);
             if (pdeFixParsed.pdecode) {
@@ -2112,10 +2164,13 @@ async function generatePipeline(task, attachments, plan) {
         pde: true, pdeExp: true,
         p5: false, p5Exp: false
       };
-      var pdeExpResult = await callPhase('explain', pdeExpPrompt, null, provider, pdeExplainSettings);
+      var pdeExpModel = getRequestModel('explain');
+      var pdeExpResult = await callPhase('explain', pdeExpPrompt, null, pdeExpModel, pdeExplainSettings);
       setDbgFlow('parse', 'Parsing Processing explanation output', 'pdeexp');
       var pdeExpParsed = parseResponse(pdeExpResult.text);
       result.pdeexp = pdeExpParsed.pdeexp;
+      result.actualModel = pdeExpResult.model;
+      result.requestedModel = pdeExpModel;
       setVeilPhase('pdeexp', 'done', '✓ Processing explanation ready');
     } catch(e) {
       console.error('Pipeline Processing explanation phase failed:', e);
@@ -2229,29 +2284,30 @@ function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replac
 // ── Call a single phase ─
 // For concept phase: include chatHistory so follow-up requests have context
 // For other phases: stateless (only system + user message)
-async function callPhase(phase, userMsg, attachments, provider, s) {
+async function callPhase(phase, userMsg, attachments, modelId, s) {
   var sysPrompt = buildPhasePrompt(phase, s);
   var maxTokens = phase === 'concept' ? 1500 : phase === 'explain' ? 3000 : 8000;
+  var provider = providerFor(modelId);
   // Concept phase includes chat history for follow-up context
   var history = (phase === 'concept' && chatHistory.length > 0) ? chatHistory.slice() : [];
   setDbgFlow('request', 'Calling ' + phase + ' phase', phase);
-  dbgAdd(phase, 'system prompt', sysPrompt, { model: MODEL, provider: provider, maxTokens: maxTokens, historyTurns: history.length });
+  dbgAdd(phase, 'system prompt', sysPrompt, { model: modelId, provider: provider, maxTokens: maxTokens, historyTurns: history.length });
   dbgAdd(phase, 'user message', userMsg);
 
   var result;
   if (provider === 'academic') {
-    result = await callPhaseAcademic(sysPrompt, userMsg, maxTokens, history);
+    result = await callPhaseAcademic(sysPrompt, userMsg, maxTokens, history, modelId);
   } else if (provider === 'gemini') {
-    result = await callPhaseGemini(sysPrompt, userMsg, attachments, maxTokens, history);
+    result = await callPhaseGemini(sysPrompt, userMsg, attachments, maxTokens, history, modelId);
   } else {
-    result = await callPhaseAnthropic(sysPrompt, userMsg, attachments, maxTokens, history);
+    result = await callPhaseAnthropic(sysPrompt, userMsg, attachments, maxTokens, history, modelId);
   }
   setDbgFlow('response', 'Received ' + phase + ' response', phase);
   dbgAdd(phase, 'response', result.text, { model: result.model });
   return result;
 }
 
-async function callPhaseAcademic(sysPrompt, userMsg, maxTokens, history) {
+async function callPhaseAcademic(sysPrompt, userMsg, maxTokens, history, modelId) {
   var BASE_URL = 'https://chat-ai.academiccloud.de/v1/chat/completions';
   var ACADEMIC_URL;
   if (academicCorsProxy) {
@@ -2280,7 +2336,7 @@ async function callPhaseAcademic(sysPrompt, userMsg, maxTokens, history) {
   var res = await fetch(ACADEMIC_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
-    body: JSON.stringify({ model: MODEL, messages: messages, temperature: 0.7, max_tokens: maxTokens })
+    body: JSON.stringify({ model: modelId, messages: messages, temperature: 0.7, max_tokens: maxTokens })
   });
   if (!res.ok) {
     var rawErr = await res.text().catch(function(){ return ''; });
@@ -2294,10 +2350,10 @@ async function callPhaseAcademic(sysPrompt, userMsg, maxTokens, history) {
   raw = raw.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
   if (!raw) throw new Error('Academic Cloud: response was only thinking tokens (no output)');
   if (data.usage) { sessionTokens.input += (data.usage.prompt_tokens||0); sessionTokens.output += (data.usage.completion_tokens||0); sessionTokens.requests++; }
-  return { text: raw, model: data.model || MODEL };
+  return { text: raw, model: data.model || modelId };
 }
 
-async function callPhaseAnthropic(sysPrompt, userMsg, attachments, maxTokens, history) {
+async function callPhaseAnthropic(sysPrompt, userMsg, attachments, maxTokens, history, modelId) {
   var msgContent;
   if (attachments && attachments.length) {
     msgContent = [];
@@ -2324,8 +2380,8 @@ async function callPhaseAnthropic(sysPrompt, userMsg, attachments, maxTokens, hi
     for (var j = 0; j < history.length; j++) { msgs.push(history[j]); }
   }
   msgs.push({ role:'user', content:msgContent });
-  var body = { model:MODEL, max_tokens:maxTokens, system:sysPrompt, messages:msgs };
-  if (thinkingBudget > 0 && isClaudeModel(MODEL)) {
+  var body = { model:modelId, max_tokens:maxTokens, system:sysPrompt, messages:msgs };
+  if (thinkingBudget > 0 && isClaudeModel(modelId)) {
     body.thinking = { type:'enabled', budget_tokens:thinkingBudget };
     body.max_tokens = Math.max(maxTokens, thinkingBudget + 2000);
   }
@@ -2337,10 +2393,10 @@ async function callPhaseAnthropic(sysPrompt, userMsg, attachments, maxTokens, hi
   var data = await res.json();
   var raw = (data.content||[]).map(function(b){ return b.text||''; }).join('');
   if (data.usage) { sessionTokens.input += (data.usage.input_tokens||0); sessionTokens.output += (data.usage.output_tokens||0); sessionTokens.requests++; }
-  return { text: raw, model: data.model || MODEL };
+  return { text: raw, model: data.model || modelId };
 }
 
-async function callPhaseGemini(sysPrompt, userMsg, attachments, maxTokens, history) {
+async function callPhaseGemini(sysPrompt, userMsg, attachments, maxTokens, history, modelId) {
   if (!apiKeys.gemini) throw new Error('Gemini API key required.');
   var parts = [];
   if (attachments && attachments.length) {
@@ -2372,7 +2428,7 @@ async function callPhaseGemini(sysPrompt, userMsg, attachments, maxTokens, histo
     }
   }
   contents.push({ role:'user', parts:parts });
-  var url = 'https://generativelanguage.googleapis.com/v1beta/models/' + MODEL + ':generateContent';
+  var url = 'https://generativelanguage.googleapis.com/v1beta/models/' + modelId + ':generateContent';
   var body = {
     systemInstruction: { parts:[{ text:sysPrompt }] },
     contents: contents,
@@ -2390,7 +2446,7 @@ async function callPhaseGemini(sysPrompt, userMsg, attachments, maxTokens, histo
   }
   if (!raw) throw new Error('Gemini returned no text');
   if (data.usageMetadata) { sessionTokens.input += (data.usageMetadata.promptTokenCount||0); sessionTokens.output += (data.usageMetadata.candidatesTokenCount||0); sessionTokens.requests++; }
-  return { text: raw, model: data.modelVersion || MODEL };
+  return { text: raw, model: data.modelVersion || modelId };
 }
 
 // ── Build user prompt (task + template additions) ─────────────
@@ -2440,18 +2496,19 @@ async function callClaude(task, attachments) {
   if (!Array.isArray(chatHistory)) chatHistory = [];
   trimHistory();
   var base = buildUserPrompt(task);
-  var provider = providerFor(MODEL);
+  var modelId = getRequestModel('single');
+  var provider = providerFor(modelId);
   if (provider === 'gemini') {
-    return await callGemini(task, base, attachments);
+    return await callGemini(task, base, attachments, modelId);
   } else if (provider === 'academic') {
-    return await callAcademicCloud(task, base, attachments);
+    return await callAcademicCloud(task, base, attachments, modelId);
   } else {
-    return await callAnthropic(task, base, attachments);
+    return await callAnthropic(task, base, attachments, modelId);
   }
 }
 
 // ── Academic Cloud / SAIA (OpenAI-compatible) ─────────────────
-async function callAcademicCloud(task, base, attachments) {
+async function callAcademicCloud(task, base, attachments, modelId) {
   var BASE_URL = 'https://chat-ai.academiccloud.de/v1/chat/completions';
   var ACADEMIC_URL;
   if (academicCorsProxy) {
@@ -2497,7 +2554,7 @@ async function callAcademicCloud(task, base, attachments) {
       'Authorization': 'Bearer ' + key
     },
     body: JSON.stringify({
-      model: MODEL,
+      model: modelId,
       messages: messages,
       temperature: 0.7
     })
@@ -2525,17 +2582,17 @@ async function callAcademicCloud(task, base, attachments) {
   setDbgFlow('response', 'Received Academic Cloud response', 'single-shot');
   chatHistory.push({ role: 'assistant', content: raw });
   if (data.usage) { sessionTokens.input += (data.usage.prompt_tokens||0); sessionTokens.output += (data.usage.completion_tokens||0); sessionTokens.requests++; }
-  dbgAdd('legacy', 'response (academic)', raw, { model: data.model || MODEL });
+  dbgAdd('legacy', 'response (academic)', raw, { model: data.model || modelId });
   setDbgFlow('parse', 'Parsing Academic Cloud response', 'single-shot');
   var parsed = parseResponse(raw);
   setDbgFlow('history', 'Updated chat history', 'single-shot');
-  parsed.actualModel = data.model || MODEL;
-  parsed.requestedModel = MODEL;
+  parsed.actualModel = data.model || modelId;
+  parsed.requestedModel = modelId;
   return parsed;
 }
 
 // ── Anthropic (Claude) ────────────────────────────────────────
-async function callAnthropic(task, base, attachments) {
+async function callAnthropic(task, base, attachments, modelId) {
   var msgContent;
   if (attachments && attachments.length) {
     msgContent = [];
@@ -2561,13 +2618,13 @@ async function callAnthropic(task, base, attachments) {
     // Required only when calling from a browser standalone (claude.ai injects this internally)
     hdrs['anthropic-dangerous-direct-browser-access']='true';
   }
-  var body = {model:MODEL, max_tokens:9000, system:buildSysPrompt(), messages:chatHistory};
-  if (thinkingBudget > 0 && isClaudeModel(MODEL)) {
+  var body = {model:modelId, max_tokens:9000, system:buildSysPrompt(), messages:chatHistory};
+  if (thinkingBudget > 0 && isClaudeModel(modelId)) {
     body.thinking = { type: 'enabled', budget_tokens: thinkingBudget };
     body.max_tokens = Math.max(9000, thinkingBudget + 4000); // ensure headroom
   }
   setDbgFlow('request', 'Calling Anthropic API', 'single-shot');
-  dbgAdd('legacy','→ request',JSON.stringify(body,null,2),{provider:'anthropic',model:MODEL});
+  dbgAdd('legacy','→ request',JSON.stringify(body,null,2),{provider:'anthropic',model:modelId});
   var res=await fetch('https://api.anthropic.com/v1/messages',{
     method:'POST',headers:hdrs,
     body:JSON.stringify(body)
@@ -2579,14 +2636,14 @@ async function callAnthropic(task, base, attachments) {
   var data=await res.json();
   var raw=(data.content||[]).map(function(b){return b.text||'';}).join('');
   setDbgFlow('response', 'Received Anthropic response', 'single-shot');
-  dbgAdd('legacy','← response',raw,{provider:'anthropic',model:data.model||MODEL,usage:data.usage});
+  dbgAdd('legacy','← response',raw,{provider:'anthropic',model:data.model||modelId,usage:data.usage});
   if (data.usage) { sessionTokens.input += (data.usage.input_tokens||0); sessionTokens.output += (data.usage.output_tokens||0); sessionTokens.requests++; }
   chatHistory.push({role:'assistant',content:raw});
   setDbgFlow('parse', 'Parsing Anthropic response', 'single-shot');
   var parsed = parseResponse(raw);
   setDbgFlow('history', 'Updated chat history', 'single-shot');
   parsed.actualModel = data.model || '(unknown)';
-  parsed.requestedModel = MODEL;
+  parsed.requestedModel = modelId;
   return parsed;
 }
 
@@ -2594,7 +2651,7 @@ async function callAnthropic(task, base, attachments) {
 // Gemini uses generativelanguage.googleapis.com, different request shape.
 // Roles: 'user' / 'model' (not 'assistant'). Content is in `parts` array.
 // System prompt goes in a separate `systemInstruction` field.
-async function callGemini(task, base, attachments) {
+async function callGemini(task, base, attachments, modelId) {
   if (!apiKeys.gemini) {
     throw new Error('Gemini API key required. Click the Gemini tab in the key banner.');
   }
@@ -2646,7 +2703,7 @@ async function callGemini(task, base, attachments) {
   }).filter(Boolean);
   chatHistory.push({ role:'user', content: historyContent });
 
-  var url = 'https://generativelanguage.googleapis.com/v1beta/models/' + MODEL + ':generateContent';
+  var url = 'https://generativelanguage.googleapis.com/v1beta/models/' + modelId + ':generateContent';
   var body = {
     systemInstruction: { parts: [{ text: buildSysPrompt() }] },
     contents: contents,
@@ -2654,7 +2711,7 @@ async function callGemini(task, base, attachments) {
   };
 
   setDbgFlow('request', 'Calling Gemini API', 'single-shot');
-  dbgAdd('legacy','→ request',JSON.stringify(body,null,2),{provider:'gemini',model:MODEL});
+  dbgAdd('legacy','→ request',JSON.stringify(body,null,2),{provider:'gemini',model:modelId});
   var res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKeys.gemini },
@@ -2680,14 +2737,14 @@ async function callGemini(task, base, attachments) {
   }
 
   setDbgFlow('response', 'Received Gemini response', 'single-shot');
-  dbgAdd('legacy','← response',raw,{provider:'gemini',model:data.modelVersion||MODEL,usage:data.usageMetadata});
+  dbgAdd('legacy','← response',raw,{provider:'gemini',model:data.modelVersion||modelId,usage:data.usageMetadata});
   if (data.usageMetadata) { sessionTokens.input += (data.usageMetadata.promptTokenCount||0); sessionTokens.output += (data.usageMetadata.candidatesTokenCount||0); sessionTokens.requests++; }
   chatHistory.push({ role: 'assistant', content: raw });
   setDbgFlow('parse', 'Parsing Gemini response', 'single-shot');
   var parsed = parseResponse(raw);
   setDbgFlow('history', 'Updated chat history', 'single-shot');
-  parsed.actualModel = data.modelVersion || MODEL;
-  parsed.requestedModel = MODEL;
+  parsed.actualModel = data.modelVersion || modelId;
+  parsed.requestedModel = modelId;
   return parsed;
 }
 
@@ -2891,6 +2948,8 @@ function buildSessionSnapshot(name){
     currentTemplate:currentTemplate,
     dmaTemplate:dmaTemplate,
     customTemplate:customTemplate,
+    promptTemplates:promptTemplates,
+    promptRequestModels:promptRequestModels,
     tokens:{ input:sessionTokens.input, output:sessionTokens.output, requests:sessionTokens.requests }
   };
 }
@@ -3038,6 +3097,24 @@ function loadSession(s){
     };
   }
   if(s.customTemplate) customTemplate=s.customTemplate;
+  if(s.promptTemplates && typeof s.promptTemplates === 'object'){
+    promptTemplates = {
+      system: typeof s.promptTemplates.system === 'string' ? s.promptTemplates.system : '',
+      concept: typeof s.promptTemplates.concept === 'string' ? s.promptTemplates.concept : '',
+      p5: typeof s.promptTemplates.p5 === 'string' ? s.promptTemplates.p5 : '',
+      pde: typeof s.promptTemplates.pde === 'string' ? s.promptTemplates.pde : '',
+      explain: typeof s.promptTemplates.explain === 'string' ? s.promptTemplates.explain : ''
+    };
+  }
+  if(s.promptRequestModels && typeof s.promptRequestModels === 'object'){
+    promptRequestModels = {
+      single: typeof s.promptRequestModels.single === 'string' ? s.promptRequestModels.single : '',
+      concept: typeof s.promptRequestModels.concept === 'string' ? s.promptRequestModels.concept : '',
+      p5: typeof s.promptRequestModels.p5 === 'string' ? s.promptRequestModels.p5 : '',
+      pde: typeof s.promptRequestModels.pde === 'string' ? s.promptRequestModels.pde : '',
+      explain: typeof s.promptRequestModels.explain === 'string' ? s.promptRequestModels.explain : ''
+    };
+  }
   if(s.currentTemplate) setActiveTpl(s.currentTemplate);
   restorePanels(); updateThinkingBar();
 }
@@ -3120,19 +3197,102 @@ G('tpl-edit-dma-item').addEventListener('click', function() {
 });
 
 // Template editor
+var PROMPT_EDITOR_SECTIONS = [
+  { key:'base', title:'Template Prompt', modelKey:'single', isBase:true, placeholder:'Use [TASK] as placeholder for the user request.' },
+  { key:'system', title:'📋 System Prompt', modelKey:'single', placeholder:'Full system instructions for single-shot and phase prompts.' },
+  { key:'concept', title:'🧠 Concept Phase Prompt', modelKey:'concept', placeholder:'Optional override for concept phase instructions.' },
+  { key:'p5', title:'🎨 p5.js Phase Prompt', modelKey:'p5', placeholder:'Optional override for p5.js generation instructions.' },
+  { key:'pde', title:'🖊 Processing Phase Prompt', modelKey:'pde', placeholder:'Optional override for Processing generation instructions.' },
+  { key:'explain', title:'📝 Explain Phase Prompt', modelKey:'explain', placeholder:'Optional override for explanation phase instructions.' }
+];
+
+function getTemplatePromptValue(which) {
+  if (which === 'dma') return ((dmaTemplate.body || '').trim() || DMA_PROMPT_DEFAULT);
+  return (customTemplate.body || '');
+}
+
+function getTemplatePromptName(which) {
+  return which === 'dma' ? 'dMA Creative Coding' : (customTemplate.name || 'Custom');
+}
+
+function collectTemplateModelOptions() {
+  var seen = {};
+  var list = [{ id:'', label:'Use Global Model (' + (MODEL_LABELS[MODEL] || MODEL) + ')' }];
+  document.querySelectorAll('.md-item[data-model]').forEach(function(el){
+    var id = el.dataset.model;
+    if (!id || seen[id]) return;
+    seen[id] = true;
+    var label = el.querySelector('.md-name') ? el.querySelector('.md-name').textContent.trim() : (MODEL_LABELS[id] || id);
+    list.push({ id:id, label:label });
+  });
+  if (!seen[MODEL]) list.push({ id:MODEL, label:MODEL_LABELS[MODEL] || MODEL });
+  return list;
+}
+
+function renderPromptEditor() {
+  var host = G('tpl-prompt-list');
+  if (!host) return;
+  var modelOptions = collectTemplateModelOptions();
+  host.innerHTML = '';
+
+  PROMPT_EDITOR_SECTIONS.forEach(function(section, idx){
+    var card = document.createElement('details');
+    card.className = 'tpl-prompt-card';
+    if (idx === 0) card.open = true;
+
+    var summary = document.createElement('summary');
+    summary.className = 'tpl-prompt-summary';
+
+    var title = document.createElement('span');
+    title.className = 'tpl-prompt-title';
+    title.textContent = section.key === 'base' ? (getTemplatePromptName(editingTemplate) + ' Prompt') : section.title;
+    if (section.isBase) {
+      var tag = document.createElement('span');
+      tag.className = 'tpl-base-tag';
+      tag.textContent = 'Base';
+      title.appendChild(tag);
+    }
+
+    var modelSelect = document.createElement('select');
+    modelSelect.className = 'tpl-model-select';
+    modelSelect.dataset.modelKey = section.modelKey;
+    for (var i = 0; i < modelOptions.length; i++) {
+      var opt = document.createElement('option');
+      opt.value = modelOptions[i].id;
+      opt.textContent = modelOptions[i].label;
+      modelSelect.appendChild(opt);
+    }
+    modelSelect.value = promptRequestModels[section.modelKey] || '';
+    modelSelect.addEventListener('click', function(e){ e.stopPropagation(); });
+    modelSelect.addEventListener('mousedown', function(e){ e.stopPropagation(); });
+
+    var body = document.createElement('div');
+    body.className = 'tpl-prompt-body';
+    var area = document.createElement('textarea');
+    area.className = 'tpl-prompt-textarea';
+    area.dataset.promptKey = section.key;
+    area.placeholder = section.placeholder;
+    if (section.key === 'base') {
+      area.value = getTemplatePromptValue(editingTemplate);
+    } else if (section.key === 'system') {
+      area.value = promptTemplates.system || '';
+    } else {
+      area.value = promptTemplates[section.key] || '';
+    }
+    body.appendChild(area);
+
+    summary.appendChild(title);
+    summary.appendChild(modelSelect);
+    card.appendChild(summary);
+    card.appendChild(body);
+    host.appendChild(card);
+  });
+}
+
 function openTemplateEditor(which) {
   editingTemplate = (which === 'dma' || which === 'custom') ? which : 'custom';
-  if(editingTemplate === 'dma'){
-    G('tpl-editor-title').textContent = 'dMA Template';
-    G('tpl-name-input').value = dmaTemplate.name || 'dMA Creative Coding';
-    G('tpl-name-input').disabled = true;
-    G('tpl-textarea').value   = dmaTemplate.body || DMA_PROMPT_DEFAULT;
-  } else {
-    G('tpl-editor-title').textContent = 'Custom Template';
-    G('tpl-name-input').value = customTemplate.name || '';
-    G('tpl-name-input').disabled = false;
-    G('tpl-textarea').value   = customTemplate.body || '';
-  }
+  G('tpl-editor-title').textContent = 'Prompt Templates — ' + getTemplatePromptName(editingTemplate);
+  renderPromptEditor();
   G('tpl-editor').classList.add('open');
   G('tpl-editor-overlay').classList.add('open');
 }
@@ -3141,21 +3301,42 @@ function closeTemplateEditor() {
   G('tpl-editor-overlay').classList.remove('open');
 }
 
-G('tpl-save-btn').addEventListener('click', function() {
-  var body = G('tpl-textarea').value.trim();
-  if(editingTemplate === 'dma'){
-    dmaTemplate = { name:'dMA Creative Coding', body: body || DMA_PROMPT_DEFAULT };
+function savePromptEditor() {
+  var baseArea = document.querySelector('textarea[data-prompt-key="base"]');
+  var systemArea = document.querySelector('textarea[data-prompt-key="system"]');
+  var conceptArea = document.querySelector('textarea[data-prompt-key="concept"]');
+  var p5Area = document.querySelector('textarea[data-prompt-key="p5"]');
+  var pdeArea = document.querySelector('textarea[data-prompt-key="pde"]');
+  var explainArea = document.querySelector('textarea[data-prompt-key="explain"]');
+
+  var baseBody = baseArea ? baseArea.value.trim() : '';
+  if (editingTemplate === 'dma') {
+    dmaTemplate = { name:'dMA Creative Coding', body: baseBody || DMA_PROMPT_DEFAULT };
     setActiveTpl('dma');
-    addBubble('Template <strong>dMA Creative Coding</strong> saved and active.', 'claude');
   } else {
-    var name = G('tpl-name-input').value.trim() || 'Custom';
-    customTemplate = { name: name, body: body };
+    customTemplate = { name: (customTemplate.name || 'Custom'), body: baseBody };
     setActiveTpl('custom');
-    addBubble('Template <strong>' + name + '</strong> saved and active.', 'claude');
   }
+
+  promptTemplates.system = systemArea ? systemArea.value.trim() : '';
+  promptTemplates.concept = conceptArea ? conceptArea.value.trim() : '';
+  promptTemplates.p5 = p5Area ? p5Area.value.trim() : '';
+  promptTemplates.pde = pdeArea ? pdeArea.value.trim() : '';
+  promptTemplates.explain = explainArea ? explainArea.value.trim() : '';
+
+  document.querySelectorAll('.tpl-model-select').forEach(function(sel){
+    var key = sel.dataset.modelKey;
+    if (!key) return;
+    promptRequestModels[key] = sel.value || '';
+  });
+
   closeTemplateEditor();
   saveState();
-});
+  addBubble('Prompt templates for <strong>' + getTemplatePromptName(editingTemplate) + '</strong> saved.', 'claude');
+}
+
+G('tpl-save-btn').addEventListener('click', savePromptEditor);
+G('tpl-save-top-btn').addEventListener('click', savePromptEditor);
 G('tpl-cancel-btn').addEventListener('click', closeTemplateEditor);
 G('tpl-editor-close').addEventListener('click', closeTemplateEditor);
 G('tpl-editor-overlay').addEventListener('click', closeTemplateEditor);
@@ -3280,7 +3461,9 @@ function saveState(){
       model: MODEL,
       currentTemplate: currentTemplate,
       dmaTemplate: dmaTemplate,
-      customTemplate: customTemplate
+      customTemplate: customTemplate,
+      promptTemplates: promptTemplates,
+      promptRequestModels: promptRequestModels
     }));
   }catch(e){console.warn('prefs save failed',e);}
 }
@@ -3314,6 +3497,26 @@ function loadState(){
       customTemplate = {
         name: typeof s.customTemplate.name === 'string' ? s.customTemplate.name : 'Custom',
         body: typeof s.customTemplate.body === 'string' ? s.customTemplate.body : ''
+      };
+    }
+
+    if(s.promptTemplates && typeof s.promptTemplates === 'object'){
+      promptTemplates = {
+        system: typeof s.promptTemplates.system === 'string' ? s.promptTemplates.system : '',
+        concept: typeof s.promptTemplates.concept === 'string' ? s.promptTemplates.concept : '',
+        p5: typeof s.promptTemplates.p5 === 'string' ? s.promptTemplates.p5 : '',
+        pde: typeof s.promptTemplates.pde === 'string' ? s.promptTemplates.pde : '',
+        explain: typeof s.promptTemplates.explain === 'string' ? s.promptTemplates.explain : ''
+      };
+    }
+
+    if(s.promptRequestModels && typeof s.promptRequestModels === 'object'){
+      promptRequestModels = {
+        single: typeof s.promptRequestModels.single === 'string' ? s.promptRequestModels.single : '',
+        concept: typeof s.promptRequestModels.concept === 'string' ? s.promptRequestModels.concept : '',
+        p5: typeof s.promptRequestModels.p5 === 'string' ? s.promptRequestModels.p5 : '',
+        pde: typeof s.promptRequestModels.pde === 'string' ? s.promptRequestModels.pde : '',
+        explain: typeof s.promptRequestModels.explain === 'string' ? s.promptRequestModels.explain : ''
       };
     }
 
@@ -3549,7 +3752,7 @@ async function send(){
       G('veil-detail').textContent = '🔧 Auto-fixing preview error: ' + lastP5Error;
       try {
         var fixMsg = 'The following p5.js sketch has a SYNTAX error:\n\nError: ' + lastP5Error + '\n\nOriginal code:\n```p5instance\n' + r.p5code + '\n```\n\nSTRICT TASK: Fix only syntax errors. Do not redesign, refactor, or change behavior beyond syntax validity. Return only the corrected complete p5.js sketch in ### p5 sketch format.';
-        var fixResult = await callPhase('p5', fixMsg, null, providerFor(MODEL), getSettings());
+        var fixResult = await callPhase('p5', fixMsg, null, getRequestModel('p5'), getSettings());
         var fixParsed = parseResponse(fixResult.text);
         if (fixParsed.p5code) {
           r.p5code = fixParsed.p5code;
