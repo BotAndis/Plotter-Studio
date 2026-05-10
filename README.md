@@ -12,9 +12,12 @@ Plotter Studio is a browser-based AI creative coding tool for pen-plotter workfl
 - **Runtime requirements:** Modern browser, and Python 3 only if using the local proxy
 - **License:** MIT
 
+## DEMO:
+https://claude.ai/public/artifacts/83b28324-d48d-4303-ab9e-908f2db17923
+
 ## Run Locally with Your Own API Key
 
-This is the flexible option. You open the HTML file locally in your browser and use your own provider key.
+You open the HTML file locally in your browser and use your own provider key.
 
 Supported providers include:
 
