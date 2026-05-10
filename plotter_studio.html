@@ -1634,6 +1634,60 @@ function getRequestModel(requestKey) {
   var chosen = promptRequestModels[requestKey];
   return chosen && typeof chosen === 'string' ? chosen : MODEL;
 }
+function getDefaultPhasePrompt(phase, s) {
+  if (!s) s = getSettings();
+
+  if (phase === 'concept') {
+    return 'OUTPUT: Generate ONLY a concept. Return exactly:\n### [Concept Title]\nTwo or three sentences describing what the viewer sees, which generative system drives it, and why it works as a plotted drawing.\n\nThen append this final section, separated by two line breaks:\n### User Prompt\n<the user request>\n\nCRITICAL: Do NOT output any code (no Processing, no p5.js, no Java, no JavaScript). Do NOT include ```code blocks```. ONLY return the ### title, 2-3 sentence description, and final ### User Prompt section. Nothing else.\n\nIf this is a follow-up request that modifies a previous sketch, describe how the concept evolves — what was there before and what changes.';
+  }
+
+  if (phase === 'p5') {
+    var ctrlRules = [];
+    if (s.textBtn)     ctrlRules.push('Add a p.createButton("Text: On / Off") that toggles all canvas text and redraws.');
+    if (s.lineTextBtn) ctrlRules.push('Add a p.createButton("Line Labels: On / Off") that toggles XY coordinate labels at line endpoints and redraws.');
+    if (s.reseedBtn)   ctrlRules.push('Add a p.createButton("⟳ Reseed") that picks a new random seed and redraws the entire sketch.');
+    if (s.sliders)     ctrlRules.push('Add p.createSlider() controls for meaningful parameters. Label each. Attach .input() to redraw.');
+    var ctrlBlock = ctrlRules.length
+      ? 'REQUIRED CONTROLS:\n' + ctrlRules.map(function(r){return '- '+r;}).join('\n')
+      : 'Do NOT add any interactive controls.';
+    return "OUTPUT: Return exactly this structure:\n### p5 sketch\n```p5instance\nfunction(p) { ... }\n```\n\n" +
+      "p5.js instance-mode function. Format:\n```p5instance\nfunction(p) {\n  let seed = 12345;\n  p.setup = function() {\n    p.createCanvas(540, 383);\n    p.background(255);\n    p.randomSeed(seed); p.noiseSeed(seed);\n    drawSketch(); p.noLoop();\n  };\n  function drawSketch() { /* drawing */ }\n  p.draw = function() {};\n}\n```\n" +
+      "Canvas 540x383. White bg. noFill. Black strokes. let seed = <number>; at top.\n" +
+      ctrlBlock + "\n\nCRITICAL RULES:\n- NEVER use document.getElementById(), document.querySelector(), p.select(), or any direct DOM access.\n- NEVER call appendChild on DOM elements.\n- All UI elements MUST use p5 instance methods: p.createButton(), p.createSlider(), p.createDiv(), etc.\n- The sketch runs in an isolated container — there are no external DOM elements to reference.\n- All p5 calls MUST use the instance prefix: p.rect(), p.line(), p.fill(), NOT rect(), line(), fill().\n\nNo concept text. No Processing code. No explanations. ONLY the ### p5 sketch section.";
+  }
+
+  if (phase === 'pde') {
+    var modelLabel = (typeof MODEL === 'string' && MODEL) ? MODEL : 'default model';
+    return "OUTPUT: Return exactly this structure:\n### Processing code\n```processing\n...\n```\n\nProcessing Java sketch in a ```processing block.\n" +
+      "Requirements:\n" +
+      "- import processing.svg.*; (and processing.pdf.*; when useful)\n" +
+      "- int seed = <number>; at top. randomSeed(seed); noiseSeed(seed); in setup().\n" +
+      "- Canvas 1080x764. White bg. noFill() and stroke() only.\n" +
+      "- Continuous paths: beginShape()/vertex()/endShape().\n" +
+      "- SVG export via createGraphics(width,height,SVG,filename).\n" +
+      "- saveFrame() for .jpg. noLoop() at end.\n" +
+      "- boolean SHOW_TEXT toggle. Header comment with prompt + date + model (" + modelLabel + ").\n" +
+      "- Text labels (10pt, #c84870) at line endpoints.\n" +
+      "- Footer (16pt, #c84870) bottom-right. Header top-left with line count.\n" +
+      "- Store lines in array, redraw for SVG export.\n" +
+      "- Comment for a novice. Named functions. Constants at top.\n\n" +
+      "No concept. No p5.js. No explanations. ONLY the Processing code block.";
+  }
+
+  if (phase === 'explain') {
+    var parts = [];
+    if (s.pde && s.pdeExp) {
+      parts.push("### How it works (Processing)\nPlain-language guide. **System:** **Parameters:** **SHOW_TEXT:** **Export:** **Tips:**");
+    }
+    if (s.p5 && s.p5Exp) {
+      parts.push("### How it works (p5.js)\n**System:** **Parameters:** **Controls:** **Tips:**");
+    }
+    return 'OUTPUT: Generate ONLY the following explanation section(s):\n\n' + parts.join('\n\n') +
+      '\n\nNo concept. No code. Just plain-language explanations.';
+  }
+
+  return '';
+}
 
 // dMA template user prompt addition
 var DMA_PROMPT_DEFAULT = `
@@ -1724,62 +1778,22 @@ function buildPhasePrompt(phase, s) {
 
   if (phase === 'concept') {
     var conceptOverride = getPromptOverride('concept');
-    if (conceptOverride) return sys + conceptOverride;
-    sys += 'OUTPUT: Generate ONLY a concept. Return exactly:\n### [Concept Title]\nTwo or three sentences describing what the viewer sees, which generative system drives it, and why it works as a plotted drawing.\n\nThen append this final section, separated by two line breaks:\n### User Prompt\n<the user request>\n\nCRITICAL: Do NOT output any code (no Processing, no p5.js, no Java, no JavaScript). Do NOT include ```code blocks```. ONLY return the ### title, 2-3 sentence description, and final ### User Prompt section. Nothing else.\n\nIf this is a follow-up request that modifies a previous sketch, describe how the concept evolves — what was there before and what changes.';
-    return sys;
+    return sys + (conceptOverride || getDefaultPhasePrompt('concept', s));
   }
 
   if (phase === 'p5') {
     var p5Override = getPromptOverride('p5');
-    if (p5Override) return sys + p5Override;
-    var ctrlRules = [];
-    if (s.textBtn)     ctrlRules.push('Add a p.createButton("Text: On / Off") that toggles all canvas text and redraws.');
-    if (s.lineTextBtn) ctrlRules.push('Add a p.createButton("Line Labels: On / Off") that toggles XY coordinate labels at line endpoints and redraws.');
-    if (s.reseedBtn)   ctrlRules.push('Add a p.createButton("⟳ Reseed") that picks a new random seed and redraws the entire sketch.');
-    if (s.sliders)     ctrlRules.push('Add p.createSlider() controls for meaningful parameters. Label each. Attach .input() to redraw.');
-    var ctrlBlock = ctrlRules.length
-      ? 'REQUIRED CONTROLS:\n' + ctrlRules.map(function(r){return '- '+r;}).join('\n')
-      : 'Do NOT add any interactive controls.';
-    sys += "OUTPUT: Return exactly this structure:\n### p5 sketch\n```p5instance\nfunction(p) { ... }\n```\n\n" +
-      "p5.js instance-mode function. Format:\n```p5instance\nfunction(p) {\n  let seed = 12345;\n  p.setup = function() {\n    p.createCanvas(540, 383);\n    p.background(255);\n    p.randomSeed(seed); p.noiseSeed(seed);\n    drawSketch(); p.noLoop();\n  };\n  function drawSketch() { /* drawing */ }\n  p.draw = function() {};\n}\n```\n" +
-      "Canvas 540x383. White bg. noFill. Black strokes. let seed = <number>; at top.\n" +
-      ctrlBlock + "\n\nCRITICAL RULES:\n- NEVER use document.getElementById(), document.querySelector(), p.select(), or any direct DOM access.\n- NEVER call appendChild on DOM elements.\n- All UI elements MUST use p5 instance methods: p.createButton(), p.createSlider(), p.createDiv(), etc.\n- The sketch runs in an isolated container — there are no external DOM elements to reference.\n- All p5 calls MUST use the instance prefix: p.rect(), p.line(), p.fill(), NOT rect(), line(), fill().\n\nNo concept text. No Processing code. No explanations. ONLY the ### p5 sketch section.";
-    return sys;
+    return sys + (p5Override || getDefaultPhasePrompt('p5', s));
   }
 
   if (phase === 'pde') {
     var pdeOverride = getPromptOverride('pde');
-    if (pdeOverride) return sys + pdeOverride;
-    sys += "OUTPUT: Return exactly this structure:\n### Processing code\n```processing\n...\n```\n\nProcessing Java sketch in a ```processing block.\n" +
-      "Requirements:\n" +
-      "- import processing.svg.*; (and processing.pdf.*; when useful)\n" +
-      "- int seed = <number>; at top. randomSeed(seed); noiseSeed(seed); in setup().\n" +
-      "- Canvas 1080x764. White bg. noFill() and stroke() only.\n" +
-      "- Continuous paths: beginShape()/vertex()/endShape().\n" +
-      "- SVG export via createGraphics(width,height,SVG,filename).\n" +
-      "- saveFrame() for .jpg. noLoop() at end.\n" +
-      "- boolean SHOW_TEXT toggle. Header comment with prompt + date + model (" + MODEL + ").\n" +
-      "- Text labels (10pt, #c84870) at line endpoints.\n" +
-      "- Footer (16pt, #c84870) bottom-right. Header top-left with line count.\n" +
-      "- Store lines in array, redraw for SVG export.\n" +
-      "- Comment for a novice. Named functions. Constants at top.\n\n" +
-      "No concept. No p5.js. No explanations. ONLY the Processing code block.";
-    return sys;
+    return sys + (pdeOverride || getDefaultPhasePrompt('pde', s));
   }
 
   if (phase === 'explain') {
     var explainOverride = getPromptOverride('explain');
-    if (explainOverride) return sys + explainOverride;
-    var parts = [];
-    if (s.pde && s.pdeExp) {
-      parts.push("### How it works (Processing)\nPlain-language guide. **System:** **Parameters:** **SHOW_TEXT:** **Export:** **Tips:**");
-    }
-    if (s.p5 && s.p5Exp) {
-      parts.push("### How it works (p5.js)\n**System:** **Parameters:** **Controls:** **Tips:**");
-    }
-    sys += 'OUTPUT: Generate ONLY the following explanation section(s):\n\n' + parts.join('\n\n') +
-      '\n\nNo concept. No code. Just plain-language explanations.';
-    return sys;
+    return sys + (explainOverride || getDefaultPhasePrompt('explain', s));
   }
 
   // fallback: return full prompt
@@ -3186,6 +3200,22 @@ function getTemplatePromptValue(which) {
 function getTemplatePromptName(which) {
   return which === 'dma' ? 'dMA Creative Coding' : (customTemplate.name || 'Custom');
 }
+function getPromptEditorFallbackValue(key, s) {
+  if (key === 'base') return getTemplatePromptValue(editingTemplate);
+  if (key === 'system') return DEFAULT_BASE_SYSTEM_PROMPT;
+  return getDefaultPhasePrompt(key, s);
+}
+function getPromptEditorDefaultValue(key, s) {
+  var fallback = getPromptEditorFallbackValue(key, s);
+  if (key === 'base') return fallback;
+  if (key === 'system') return getSystemPromptText();
+  return getPromptOverride(key) || fallback;
+}
+function normalizePromptOverride(value, defaultValue) {
+  var normalized = String(value || '').replace(/\r\n/g, '\n').trim();
+  var fallback = String(defaultValue || '').replace(/\r\n/g, '\n').trim();
+  return normalized === fallback ? '' : normalized;
+}
 
 function collectTemplateModelOptions() {
   var seen = {};
@@ -3205,6 +3235,7 @@ function renderPromptEditor() {
   var host = G('tpl-prompt-list');
   if (!host) return;
   var modelOptions = collectTemplateModelOptions();
+  var editorSettings = getSettings();
   host.innerHTML = '';
 
   PROMPT_EDITOR_SECTIONS.forEach(function(section, idx){
@@ -3243,14 +3274,9 @@ function renderPromptEditor() {
     var area = document.createElement('textarea');
     area.className = 'tpl-prompt-textarea';
     area.dataset.promptKey = section.key;
+    area.dataset.fallbackPrompt = getPromptEditorFallbackValue(section.key, editorSettings);
     area.placeholder = section.placeholder;
-    if (section.key === 'base') {
-      area.value = getTemplatePromptValue(editingTemplate);
-    } else if (section.key === 'system') {
-      area.value = promptTemplates.system || '';
-    } else {
-      area.value = promptTemplates[section.key] || '';
-    }
+    area.value = getPromptEditorDefaultValue(section.key, editorSettings);
     body.appendChild(area);
 
     summary.appendChild(title);
@@ -3280,6 +3306,7 @@ function savePromptEditor() {
   var p5Area = document.querySelector('textarea[data-prompt-key="p5"]');
   var pdeArea = document.querySelector('textarea[data-prompt-key="pde"]');
   var explainArea = document.querySelector('textarea[data-prompt-key="explain"]');
+  var currentSettings = getSettings();
 
   var baseBody = baseArea ? baseArea.value.trim() : '';
   if (editingTemplate === 'dma') {
@@ -3290,11 +3317,26 @@ function savePromptEditor() {
     setActiveTpl('custom');
   }
 
-  promptTemplates.system = systemArea ? systemArea.value.trim() : '';
-  promptTemplates.concept = conceptArea ? conceptArea.value.trim() : '';
-  promptTemplates.p5 = p5Area ? p5Area.value.trim() : '';
-  promptTemplates.pde = pdeArea ? pdeArea.value.trim() : '';
-  promptTemplates.explain = explainArea ? explainArea.value.trim() : '';
+  promptTemplates.system = normalizePromptOverride(
+    systemArea ? systemArea.value : '',
+    systemArea ? systemArea.dataset.fallbackPrompt : DEFAULT_BASE_SYSTEM_PROMPT
+  );
+  promptTemplates.concept = normalizePromptOverride(
+    conceptArea ? conceptArea.value : '',
+    conceptArea ? conceptArea.dataset.fallbackPrompt : getDefaultPhasePrompt('concept', currentSettings)
+  );
+  promptTemplates.p5 = normalizePromptOverride(
+    p5Area ? p5Area.value : '',
+    p5Area ? p5Area.dataset.fallbackPrompt : getDefaultPhasePrompt('p5', currentSettings)
+  );
+  promptTemplates.pde = normalizePromptOverride(
+    pdeArea ? pdeArea.value : '',
+    pdeArea ? pdeArea.dataset.fallbackPrompt : getDefaultPhasePrompt('pde', currentSettings)
+  );
+  promptTemplates.explain = normalizePromptOverride(
+    explainArea ? explainArea.value : '',
+    explainArea ? explainArea.dataset.fallbackPrompt : getDefaultPhasePrompt('explain', currentSettings)
+  );
 
   document.querySelectorAll('.tpl-model-select').forEach(function(sel){
     var key = sel.dataset.modelKey;
