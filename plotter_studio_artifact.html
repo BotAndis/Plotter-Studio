@@ -3203,8 +3203,6 @@ try{
           p.vx += fx * 3.2;
           p.vy += fy * 3.2;
           p.vz -= force * 15;
-          p.x += fx * 0.65;
-          p.y += fy * 0.65;
         }
       }
 
@@ -3238,7 +3236,6 @@ try{
   }
   var moveEvt = window.PointerEvent ? 'pointermove' : 'mousemove';
   pph.addEventListener(moveEvt, updatePreviewMouse);
-  canvas.addEventListener(moveEvt, updatePreviewMouse);
   pph.addEventListener('mouseenter', function() { mouse.inside = true; });
   pph.addEventListener('mouseleave', function() { mouse.inside = false; });
 
