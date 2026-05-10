@@ -4491,7 +4491,7 @@ try{
   if (!canvas || !pph) return;
   var ctx = canvas.getContext('2d');
   var W = 0, H = 0;
-  var NUM   = 180;
+  var NUM   = 220;
   var FOV   = 420;
   var DEPTH = 260;
   var mouse = { x: -9999, y: -9999, tx: -9999, ty: -9999, sx: -9999, sy: -9999, inside: false };
@@ -4579,9 +4579,9 @@ try{
       var ty = p.by + Math.cos(now * p.fy + p.py) * p.ay;
       var tz = p.bz + Math.sin(now * p.fz + p.pz) * p.az;
 
-      p.vx += (tx - p.x) * 0.025;
-      p.vy += (ty - p.y) * 0.025;
-      p.vz += (tz - p.z) * 0.018;
+      p.vx += (tx - p.x) * 0.011;
+      p.vy += (ty - p.y) * 0.011;
+      p.vz += (tz - p.z) * 0.008;
 
       if (mouse.inside) {
         var projZ = FOV / (FOV + p.z + DEPTH);
@@ -4601,7 +4601,7 @@ try{
         }
       }
 
-      p.vx *= 0.90; p.vy *= 0.90; p.vz *= 0.88;
+      p.vx *= 0.86; p.vy *= 0.86; p.vz *= 0.84;
       p.x += p.vx; p.y += p.vy; p.z += p.vz;
 
       var zOff = p.z + DEPTH;
