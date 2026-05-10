@@ -3236,10 +3236,9 @@ try{
     mouse.y = e.clientY - rect.top;
     mouse.inside = true;
   }
-  pph.addEventListener('mousemove', updatePreviewMouse);
-  pph.addEventListener('pointermove', updatePreviewMouse);
-  canvas.addEventListener('mousemove', updatePreviewMouse);
-  canvas.addEventListener('pointermove', updatePreviewMouse);
+  var moveEvt = window.PointerEvent ? 'pointermove' : 'mousemove';
+  pph.addEventListener(moveEvt, updatePreviewMouse);
+  canvas.addEventListener(moveEvt, updatePreviewMouse);
   pph.addEventListener('mouseenter', function() { mouse.inside = true; });
   pph.addEventListener('mouseleave', function() { mouse.inside = false; });
 
