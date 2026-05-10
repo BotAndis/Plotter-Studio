@@ -1657,6 +1657,7 @@ function getDefaultPhasePrompt(phase, s) {
   }
 
   if (phase === 'pde') {
+    var modelLabel = (typeof MODEL === 'string' && MODEL) ? MODEL : 'default model';
     return "OUTPUT: Return exactly this structure:\n### Processing code\n```processing\n...\n```\n\nProcessing Java sketch in a ```processing block.\n" +
       "Requirements:\n" +
       "- import processing.svg.*; (and processing.pdf.*; when useful)\n" +
@@ -1665,7 +1666,7 @@ function getDefaultPhasePrompt(phase, s) {
       "- Continuous paths: beginShape()/vertex()/endShape().\n" +
       "- SVG export via createGraphics(width,height,SVG,filename).\n" +
       "- saveFrame() for .jpg. noLoop() at end.\n" +
-      "- boolean SHOW_TEXT toggle. Header comment with prompt + date + model (" + MODEL + ").\n" +
+      "- boolean SHOW_TEXT toggle. Header comment with prompt + date + model (" + modelLabel + ").\n" +
       "- Text labels (10pt, #c84870) at line endpoints.\n" +
       "- Footer (16pt, #c84870) bottom-right. Header top-left with line count.\n" +
       "- Store lines in array, redraw for SVG export.\n" +
@@ -3211,9 +3212,9 @@ function getPromptEditorDefaultValue(key, s) {
   return getPromptOverride(key) || fallback;
 }
 function normalizePromptOverride(value, defaultValue) {
-  var trimmed = (value || '').trim();
-  var fallback = (defaultValue || '').trim();
-  return trimmed === fallback ? '' : trimmed;
+  var normalized = String(value || '').replace(/\r\n/g, '\n').trim();
+  var fallback = String(defaultValue || '').replace(/\r\n/g, '\n').trim();
+  return normalized === fallback ? '' : normalized;
 }
 
 function collectTemplateModelOptions() {
