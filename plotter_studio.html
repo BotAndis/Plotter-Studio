@@ -3159,8 +3159,8 @@ function setSessionPanelPosition(left, top){
   panel.dataset.positioned = '1';
 }
 var SESSION_DOCK_HOVER_DELAY_MS = 360;
-var SESSION_INITIAL_TOP_MARGIN = 16;
-var SESSION_INITIAL_TOP_OFFSET = 60;
+var SESSION_INITIAL_TOP_MARGIN_PX = 16;
+var SESSION_INITIAL_TOP_OFFSET_PX = 60;
 var SESSION_MIN_DOCK_OVERLAP_RATIO = 0.35;
 var sessionDockState = {
   docked: false,
@@ -3206,7 +3206,7 @@ function sessionCanDock(rect){
   var chatRect = G('chat').getBoundingClientRect();
   var nearBottom = Math.abs(rect.top - (chatRect.bottom + sessionDockState.gap)) <= sessionDockState.dockThreshold;
   var overlap = Math.min(rect.right, chatRect.right) - Math.max(rect.left, chatRect.left);
-  return nearBottom && overlap >= Math.min(rect.width, chatRect.width) * sessionDockState.minOverlapRatio;
+  return nearBottom && overlap > 0 && overlap >= Math.min(rect.width, chatRect.width) * sessionDockState.minOverlapRatio;
 }
 function queueSessionDock(rect){
   if(sessionDockState.docked) return;
@@ -3230,7 +3230,8 @@ function openSessionPanel(){
   if(sessionDockState.docked) syncDockedSessionToChat();
   else if(panel.dataset.positioned !== '1'){
     var chatRect = G('chat').getBoundingClientRect();
-    setSessionPanelPosition(chatRect.left - Math.max(0, panel.offsetWidth - chatRect.width), Math.max(SESSION_INITIAL_TOP_MARGIN, chatRect.top + SESSION_INITIAL_TOP_OFFSET));
+    var initialLeft = chatRect.left - Math.max(0, panel.offsetWidth - chatRect.width);
+    setSessionPanelPosition(initialLeft, Math.max(SESSION_INITIAL_TOP_MARGIN_PX, chatRect.top + SESSION_INITIAL_TOP_OFFSET_PX));
   }
 }
 function closeSessionPanel(){
