@@ -21,8 +21,8 @@ Plotter Studio is a browser-based vibe coding tool for Experimental drawing and 
 ---
 
 Demo Artifact:
-[https://claude.ai/public/artifacts/83b28324-d48d-4303-ab9e-908f2db17923](https://claude.ai/public/artifacts/83b28324-d48d-4303-ab9e-908f2db17923)
-
+[[https://claude.ai/public/artifacts/83b28324-d48d-4303-ab9e-908f2db17923](https://claude.ai/public/artifacts/83b28324-d48d-4303-ab9e-908f2db17923)
+](https://claude.ai/public/artifacts/50c651e4-8f2b-423d-9ff4-f8f5df0fc706)
 ---
 
 ## Run Locally with Your Own API Key
