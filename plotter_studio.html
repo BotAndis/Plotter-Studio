@@ -331,7 +331,18 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);font
   transition:box-shadow .18s,border-color .18s;
 }
 #session-panel.open{display:flex}
-.sp2-hdr{height:36px;background:var(--surf2);border-bottom:1px solid var(--brd);display:flex;align-items:center;padding:0 12px;gap:8px;flex-shrink:0;cursor:grab;user-select:none}
+.sp2-hdr{
+  height:36px;
+  background:var(--surf2);
+  border-bottom:1px solid var(--brd);
+  display:flex;
+  align-items:center;
+  padding:0 12px;
+  gap:8px;
+  flex-shrink:0;
+  cursor:grab;
+  user-select:none
+}
 .sp2-hdr:active{cursor:grabbing}
 .session-dock-target{box-shadow:0 0 0 1px rgba(192,104,32,.55),0 12px 54px rgba(192,104,32,.22)}
 #session-panel.docking{border-color:var(--acc);box-shadow:0 0 0 1px rgba(192,104,32,.5),0 12px 46px rgba(0,0,0,.72)}
@@ -3147,14 +3158,18 @@ function setSessionPanelPosition(left, top){
   panel.style.top = pos.top + 'px';
   panel.dataset.positioned = '1';
 }
+var SESSION_DOCK_HOVER_DELAY_MS = 360;
+var SESSION_INITIAL_TOP_MARGIN = 16;
+var SESSION_INITIAL_TOP_OFFSET = 60;
+var SESSION_MIN_DOCK_OVERLAP_RATIO = 0.35;
 var sessionDockState = {
   docked: false,
   holdTimer: null,
-  holdDelay: 360,
+  holdDelay: SESSION_DOCK_HOVER_DELAY_MS,
   gap: 10,
   leftOffset: 0,
   dockThreshold: 26,
-  minOverlapRatio: 0.35
+  minOverlapRatio: SESSION_MIN_DOCK_OVERLAP_RATIO
 };
 function clearSessionDockTimer(){
   if(sessionDockState.holdTimer){
@@ -3215,7 +3230,7 @@ function openSessionPanel(){
   if(sessionDockState.docked) syncDockedSessionToChat();
   else if(panel.dataset.positioned !== '1'){
     var chatRect = G('chat').getBoundingClientRect();
-    setSessionPanelPosition(chatRect.left - Math.max(0, panel.offsetWidth - chatRect.width), Math.max(16, chatRect.top + 60));
+    setSessionPanelPosition(chatRect.left - Math.max(0, panel.offsetWidth - chatRect.width), Math.max(SESSION_INITIAL_TOP_MARGIN, chatRect.top + SESSION_INITIAL_TOP_OFFSET));
   }
 }
 function closeSessionPanel(){
