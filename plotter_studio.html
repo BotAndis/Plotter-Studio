@@ -361,29 +361,31 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);font
   position:absolute;
   left:0;
   top:0;
-  width:3px;
-  height:3px;
+  width:var(--dock-dot-size,3px);
+  height:var(--dock-dot-size,3px);
   border-radius:50%;
-  background:rgba(192,104,32,.28);
+  background:rgba(192,104,32,.22);
   transform:translate(-50%,-50%);
+  opacity:0;
+  will-change:transform,opacity;
 }
 #session-dock-burst.bursting .dock-burst-dot{
-  animation:dock-burst 460ms cubic-bezier(.2,.62,.18,1) forwards;
+  animation:dock-burst-drift var(--dock-dot-duration,2800ms) cubic-bezier(.2,.82,.16,1) forwards;
+  animation-delay:var(--dock-dot-delay,0ms);
 }
-.dock-burst-dot:nth-child(1){--dx:-16px;--dy:-5px;animation-delay:0ms}
-.dock-burst-dot:nth-child(2){--dx:14px;--dy:-6px;animation-delay:15ms}
-.dock-burst-dot:nth-child(3){--dx:-11px;--dy:10px;animation-delay:10ms}
-.dock-burst-dot:nth-child(4){--dx:12px;--dy:9px;animation-delay:5ms}
-.dock-burst-dot:nth-child(5){--dx:0px;--dy:-14px;animation-delay:0ms}
-.dock-burst-dot:nth-child(6){--dx:0px;--dy:14px;animation-delay:8ms}
-.dock-burst-dot:nth-child(7){--dx:-20px;--dy:2px;animation-delay:12ms}
-.dock-burst-dot:nth-child(8){--dx:20px;--dy:1px;animation-delay:18ms}
-.dock-burst-dot:nth-child(9){--dx:-8px;--dy:-12px;animation-delay:6ms}
-.dock-burst-dot:nth-child(10){--dx:8px;--dy:12px;animation-delay:9ms}
-@keyframes dock-burst{
-  0%{transform:translate(-50%,-50%) scale(.75);opacity:.3}
-  75%{opacity:.08}
-  100%{transform:translate(calc(-50% + var(--dx,0px)),calc(-50% + var(--dy,0px))) scale(1);opacity:0}
+@keyframes dock-burst-drift{
+  0%{
+    transform:translate(-50%,-50%) scale(.72);
+    opacity:var(--dock-dot-alpha-start,.34);
+  }
+  16%{
+    transform:translate(calc(-50% + var(--dock-dot-mid-x,0px)),calc(-50% + var(--dock-dot-mid-y,0px))) scale(1);
+    opacity:var(--dock-dot-alpha-mid,.2);
+  }
+  100%{
+    transform:translate(calc(-50% + var(--dock-dot-end-x,0px)),calc(-50% + var(--dock-dot-end-y,0px))) scale(.92);
+    opacity:0;
+  }
 }
 .sp2-title{font-size:9px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--txhi);flex:1}
 #session-list-wrap{flex:1;overflow-y:auto;min-height:0}
@@ -3233,6 +3235,21 @@ function syncDockedSessionToChat(){
   var target = getDockedSessionTarget(chatRect);
   setSessionPanelPosition(target.left, target.top);
 }
+function getSessionDockBurstTarget(startX, startY, angle, margin){
+  var dirX = Math.cos(angle);
+  var dirY = Math.sin(angle);
+  var t = Infinity;
+  if(dirX > 0) t = Math.min(t, (window.innerWidth + margin - startX) / dirX);
+  else if(dirX < 0) t = Math.min(t, (-margin - startX) / dirX);
+  if(dirY > 0) t = Math.min(t, (window.innerHeight + margin - startY) / dirY);
+  else if(dirY < 0) t = Math.min(t, (-margin - startY) / dirY);
+  if(!isFinite(t) || t < 0) t = Math.max(window.innerWidth, window.innerHeight);
+  var travel = t + (18 + Math.random() * 86);
+  return {
+    x: dirX * travel,
+    y: dirY * travel
+  };
+}
 function playSessionDockBurst(){
   var chatRect = G('chat').getBoundingClientRect();
   var panelRect = G('session-panel').getBoundingClientRect();
@@ -3241,6 +3258,25 @@ function playSessionDockBurst(){
   var burstX = overlapRight > overlapLeft ? (overlapLeft + overlapRight) / 2 : ((chatRect.left + chatRect.right) / 2);
   var burstY = panelRect.top - (sessionDockState.gap / 2);
   var burst = G('session-dock-burst');
+  var dots = burst.querySelectorAll('.dock-burst-dot');
+  var edgeMargin = 12;
+  for(var i = 0; i < dots.length; i++){
+    var dot = dots[i];
+    var angle = Math.random() * Math.PI * 2;
+    var burstStep = 9 + Math.random() * 21;
+    var midX = Math.cos(angle) * burstStep;
+    var midY = Math.sin(angle) * burstStep;
+    var end = getSessionDockBurstTarget(burstX, burstY, angle + ((Math.random() - 0.5) * 0.22), edgeMargin);
+    dot.style.setProperty('--dock-dot-mid-x', midX.toFixed(2) + 'px');
+    dot.style.setProperty('--dock-dot-mid-y', midY.toFixed(2) + 'px');
+    dot.style.setProperty('--dock-dot-end-x', end.x.toFixed(2) + 'px');
+    dot.style.setProperty('--dock-dot-end-y', end.y.toFixed(2) + 'px');
+    dot.style.setProperty('--dock-dot-delay', Math.floor(Math.random() * 140) + 'ms');
+    dot.style.setProperty('--dock-dot-duration', Math.floor(2300 + Math.random() * 1900) + 'ms');
+    dot.style.setProperty('--dock-dot-size', (2 + Math.random() * 2.2).toFixed(2) + 'px');
+    dot.style.setProperty('--dock-dot-alpha-start', (0.2 + Math.random() * 0.18).toFixed(2));
+    dot.style.setProperty('--dock-dot-alpha-mid', (0.08 + Math.random() * 0.12).toFixed(2));
+  }
   burst.style.setProperty('--dock-burst-x', burstX + 'px');
   burst.style.setProperty('--dock-burst-y', burstY + 'px');
   burst.classList.remove('bursting');
