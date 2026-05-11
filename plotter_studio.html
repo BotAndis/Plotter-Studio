@@ -323,14 +323,71 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);font
 #session-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9150;display:none}
 #session-overlay.open{display:block}
 #session-panel{
-  position:fixed;z-index:9200;width:300px;
+  position:fixed;z-index:9200;width:380px;
   bottom:80px;right:20px;
   background:var(--surf);border:1px solid var(--brdhi);
   border-radius:8px;box-shadow:0 10px 36px rgba(0,0,0,.65);
   display:none;flex-direction:column;overflow:hidden;max-height:420px;
+  transition:box-shadow .18s,border-color .18s;
 }
 #session-panel.open{display:flex}
-.sp2-hdr{height:36px;background:var(--surf2);border-bottom:1px solid var(--brd);display:flex;align-items:center;padding:0 12px;gap:8px;flex-shrink:0}
+.sp2-hdr{
+  height:36px;
+  background:var(--surf2);
+  border-bottom:1px solid var(--brd);
+  display:flex;
+  align-items:center;
+  padding:0 12px;
+  gap:8px;
+  flex-shrink:0;
+  cursor:grab;
+  user-select:none
+}
+.sp2-hdr:active{cursor:grabbing}
+.session-dock-target{box-shadow:0 0 0 1px rgba(192,104,32,.55),0 12px 54px rgba(192,104,32,.22)}
+#session-panel.docking{border-color:var(--acc);box-shadow:0 0 0 1px rgba(192,104,32,.5),0 12px 46px rgba(0,0,0,.72)}
+#session-dock-burst{
+  position:fixed;
+  left:var(--dock-burst-x,-999px);
+  top:var(--dock-burst-y,-999px);
+  width:0;
+  height:0;
+  pointer-events:none;
+  z-index:9399;
+  opacity:0;
+}
+#session-dock-burst.bursting{opacity:1}
+.dock-burst-dot{
+  position:absolute;
+  left:0;
+  top:0;
+  width:var(--dock-dot-size,3px);
+  height:var(--dock-dot-size,3px);
+  border-radius:50%;
+  background:var(--acc);
+  box-shadow:0 0 10px rgba(192,104,32,.75);
+  transform:translate(-50%,-50%);
+  opacity:0;
+  will-change:transform,opacity;
+}
+#session-dock-burst.bursting .dock-burst-dot{
+  animation:dock-burst-drift var(--dock-dot-duration,2800ms) cubic-bezier(.2,.82,.16,1) forwards;
+  animation-delay:var(--dock-dot-delay,0ms);
+}
+@keyframes dock-burst-drift{
+  0%{
+    transform:translate(-50%,-50%) scale(.72);
+    opacity:var(--dock-dot-alpha-start,.34);
+  }
+  16%{
+    transform:translate(calc(-50% + var(--dock-dot-mid-x,0px)),calc(-50% + var(--dock-dot-mid-y,0px))) scale(1);
+    opacity:var(--dock-dot-alpha-mid,.2);
+  }
+  100%{
+    transform:translate(calc(-50% + var(--dock-dot-end-x,0px)),calc(-50% + var(--dock-dot-end-y,0px))) scale(.92);
+    opacity:0;
+  }
+}
 .sp2-title{font-size:9px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--txhi);flex:1}
 #session-list-wrap{flex:1;overflow-y:auto;min-height:0}
 #session-list{display:flex;flex-direction:column}
@@ -1360,6 +1417,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);font
   </div>
 </div>
 <div id="session-overlay"></div>
+<div id="session-dock-burst" aria-hidden="true"></div>
 
 <!-- Reset confirm dialog -->
 <div id="reset-confirm">
@@ -3125,11 +3183,182 @@ function loadSession(s){
   if(s.currentTemplate) setActiveTpl(s.currentTemplate);
   restorePanels(); updateThinkingBar();
 }
-function openSessionPanel(){ renderSessionList(); G('session-panel').classList.add('open'); G('session-overlay').classList.add('open'); }
-function closeSessionPanel(){ G('session-panel').classList.remove('open'); G('session-overlay').classList.remove('open'); }
-G('session-btn').addEventListener('click',function(e){e.stopPropagation();openSessionPanel();});
+function clampSessionPanelPosition(left, top){
+  var panel = G('session-panel');
+  var maxLeft = Math.max(0, window.innerWidth - panel.offsetWidth);
+  var maxTop = Math.max(0, window.innerHeight - panel.offsetHeight);
+  return {
+    left: Math.min(Math.max(0, left), maxLeft),
+    top: Math.min(Math.max(0, top), maxTop)
+  };
+}
+function setSessionPanelPosition(left, top){
+  var pos = clampSessionPanelPosition(left, top);
+  var panel = G('session-panel');
+  panel.style.right = 'auto';
+  panel.style.bottom = 'auto';
+  panel.style.left = pos.left + 'px';
+  panel.style.top = pos.top + 'px';
+  panel.dataset.positioned = '1';
+}
+var SESSION_DOCK_HOVER_DELAY_MILLISECONDS = 360;
+var SESSION_INITIAL_TOP_MARGIN_PX = 16;
+var SESSION_INITIAL_TOP_OFFSET_PX = 60;
+var SESSION_MIN_DOCK_OVERLAP_RATIO = 0.35;
+var SESSION_DOCK_BURST_DOT_COUNT = 48;
+var sessionDockState = {
+  docked: false,
+  holdTimer: null,
+  holdDelay: SESSION_DOCK_HOVER_DELAY_MILLISECONDS,
+  gap: 10,
+  leftOffset: 0,
+  dockThreshold: 26,
+  minOverlapRatio: SESSION_MIN_DOCK_OVERLAP_RATIO
+};
+function clearSessionDockTimer(){
+  if(sessionDockState.holdTimer){
+    clearTimeout(sessionDockState.holdTimer);
+    sessionDockState.holdTimer = null;
+  }
+}
+function setSessionDockPreview(active){
+  G('session-panel').classList.toggle('docking', !!active);
+  G('chat').classList.toggle('session-dock-target', !!active);
+}
+function getDockedSessionTarget(chatRect){
+  return clampSessionPanelPosition(chatRect.left + sessionDockState.leftOffset, chatRect.bottom + sessionDockState.gap);
+}
+function syncDockedSessionToChat(){
+  if(!sessionDockState.docked) return;
+  var chatRect = G('chat').getBoundingClientRect();
+  var target = getDockedSessionTarget(chatRect);
+  setSessionPanelPosition(target.left, target.top);
+}
+function getSessionDockBurstTarget(startX, startY, angle, margin){
+  var dirX = Math.cos(angle);
+  var dirY = Math.sin(angle);
+  var t = Infinity;
+  if(dirX > 0) t = Math.min(t, (window.innerWidth + margin - startX) / dirX);
+  else if(dirX < 0) t = Math.min(t, (-margin - startX) / dirX);
+  if(dirY > 0) t = Math.min(t, (window.innerHeight + margin - startY) / dirY);
+  else if(dirY < 0) t = Math.min(t, (-margin - startY) / dirY);
+  if(!isFinite(t) || t < 0) t = Math.max(window.innerWidth, window.innerHeight);
+  var travel = t + (18 + Math.random() * 86);
+  return {
+    x: dirX * travel,
+    y: dirY * travel
+  };
+}
+function ensureSessionDockBurstDots(burst, count){
+  var existing = burst.querySelectorAll('.dock-burst-dot');
+  if(existing.length >= count) return existing;
+  for(var i = existing.length; i < count; i++){
+    var dot = document.createElement('span');
+    dot.className = 'dock-burst-dot';
+    burst.appendChild(dot);
+  }
+  return burst.querySelectorAll('.dock-burst-dot');
+}
+function playSessionDockBurst(){
+  var chatRect = G('chat').getBoundingClientRect();
+  var panelRect = G('session-panel').getBoundingClientRect();
+  var overlapLeft = Math.max(chatRect.left, panelRect.left);
+  var overlapRight = Math.min(chatRect.right, panelRect.right);
+  var spawnLeft = overlapRight > overlapLeft ? overlapLeft : chatRect.left;
+  var spawnWidth = Math.max(1, overlapRight > overlapLeft ? (overlapRight - overlapLeft) : chatRect.width);
+  var burstX = spawnLeft;
+  var burstY = panelRect.top - (sessionDockState.gap / 2);
+  var burst = G('session-dock-burst');
+  var dots = ensureSessionDockBurstDots(burst, SESSION_DOCK_BURST_DOT_COUNT);
+  var edgeMargin = 12;
+  for(var i = 0; i < dots.length; i++){
+    var dot = dots[i];
+    var spawnOffset = (((i + 0.5) / dots.length) * spawnWidth) + ((Math.random() - 0.5) * 8);
+    spawnOffset = Math.max(0, Math.min(spawnWidth, spawnOffset));
+    var startX = burstX + spawnOffset;
+    dot.style.left = spawnOffset.toFixed(2) + 'px';
+    dot.style.top = '0px';
+    var angle = Math.random() * Math.PI * 2;
+    var burstStep = 9 + Math.random() * 21;
+    var midX = Math.cos(angle) * burstStep;
+    var midY = Math.sin(angle) * burstStep;
+    var end = getSessionDockBurstTarget(startX, burstY, angle + ((Math.random() - 0.5) * 0.22), edgeMargin);
+    dot.style.setProperty('--dock-dot-mid-x', midX.toFixed(2) + 'px');
+    dot.style.setProperty('--dock-dot-mid-y', midY.toFixed(2) + 'px');
+    dot.style.setProperty('--dock-dot-end-x', end.x.toFixed(2) + 'px');
+    dot.style.setProperty('--dock-dot-end-y', end.y.toFixed(2) + 'px');
+    dot.style.setProperty('--dock-dot-delay', Math.floor(Math.random() * 140) + 'ms');
+    dot.style.setProperty('--dock-dot-duration', Math.floor(6400 + Math.random() * 3600) + 'ms');
+    dot.style.setProperty('--dock-dot-size', (3.2 + Math.random() * 2.8).toFixed(2) + 'px');
+    dot.style.setProperty('--dock-dot-alpha-start', (0.76 + Math.random() * 0.2).toFixed(2));
+    dot.style.setProperty('--dock-dot-alpha-mid', (0.34 + Math.random() * 0.24).toFixed(2));
+  }
+  burst.style.setProperty('--dock-burst-x', burstX + 'px');
+  burst.style.setProperty('--dock-burst-y', burstY + 'px');
+  burst.classList.remove('bursting');
+  // Force a reflow after removing the class so re-adding it replays the burst from frame 0.
+  void burst.offsetWidth;
+  burst.classList.add('bursting');
+}
+function dockSessionToChat(){
+  clearSessionDockTimer();
+  sessionDockState.docked = true;
+  sessionDockState.leftOffset = 0;
+  setSessionDockPreview(false);
+  syncDockedSessionToChat();
+  playSessionDockBurst();
+}
+function undockSessionPanel(){
+  clearSessionDockTimer();
+  setSessionDockPreview(false);
+  sessionDockState.docked = false;
+}
+function sessionCanDock(rect){
+  var chatRect = G('chat').getBoundingClientRect();
+  var isNearChatBottom = Math.abs(rect.top - (chatRect.bottom + sessionDockState.gap)) <= sessionDockState.dockThreshold;
+  var overlap = Math.min(rect.right, chatRect.right) - Math.max(rect.left, chatRect.left);
+  var hasPositiveOverlap = overlap > 0;
+  var meetsMinimumOverlap = overlap >= Math.min(rect.width, chatRect.width) * sessionDockState.minOverlapRatio;
+  return isNearChatBottom && hasPositiveOverlap && meetsMinimumOverlap;
+}
+function queueSessionDock(rect){
+  if(sessionDockState.docked) return;
+  if(sessionCanDock(rect)){
+    setSessionDockPreview(true);
+    if(!sessionDockState.holdTimer){
+      sessionDockState.holdTimer = setTimeout(function(){
+        dockSessionToChat();
+      }, sessionDockState.holdDelay);
+    }
+  } else {
+    clearSessionDockTimer();
+    setSessionDockPreview(false);
+  }
+}
+function openSessionPanel(){
+  var panel = G('session-panel');
+  renderSessionList();
+  panel.classList.add('open');
+  G('session-overlay').classList.remove('open');
+  if(sessionDockState.docked) syncDockedSessionToChat();
+  else if(panel.dataset.positioned !== '1'){
+    var chatRect = G('chat').getBoundingClientRect();
+    var initialLeft = chatRect.left - Math.max(0, panel.offsetWidth - chatRect.width);
+    setSessionPanelPosition(initialLeft, Math.max(SESSION_INITIAL_TOP_MARGIN_PX, chatRect.top + SESSION_INITIAL_TOP_OFFSET_PX));
+  }
+}
+function closeSessionPanel(){
+  clearSessionDockTimer();
+  setSessionDockPreview(false);
+  G('session-panel').classList.remove('open');
+  G('session-overlay').classList.remove('open');
+}
+G('session-btn').addEventListener('click',function(e){
+  e.stopPropagation();
+  if(G('session-panel').classList.contains('open')) closeSessionPanel();
+  else openSessionPanel();
+});
 G('session-close').addEventListener('click',closeSessionPanel);
-G('session-overlay').addEventListener('click',closeSessionPanel);
 G('session-save-btn').addEventListener('click',saveCurrentSession);
 G('session-autosave-btn').addEventListener('click',toggleAutosave);
 G('session-load-btn').addEventListener('click',function(){ loadSessionByIndex(selectedSessionIndex); });
@@ -4038,14 +4267,52 @@ G('cors-proxy-clear').addEventListener('click', function() {
 
 // ── Chat minimise ─────────────────────────────────────────────
 var mini=false;
-G('ctog').addEventListener('click',function(){mini=!mini;G('chat').classList.toggle('mini',mini);G('ctog').textContent=mini?'+':'−';});
+G('ctog').addEventListener('click',function(){mini=!mini;G('chat').classList.toggle('mini',mini);G('ctog').textContent=mini?'+':'−';syncDockedSessionToChat();});
 
 // ── Drag ──────────────────────────────────────────────────────
 (function(){
   var pod=G('chat'),hdr=G('chdr');var drag=false,ox=0,oy=0,sx=0,sy=0;
   hdr.addEventListener('mousedown',function(e){if(e.target.classList.contains('hbtn'))return;drag=true;sx=e.clientX;sy=e.clientY;var rr=pod.getBoundingClientRect();ox=rr.left;oy=rr.top;e.preventDefault();});
-  document.addEventListener('mousemove',function(e){if(!drag)return;pod.style.right='auto';pod.style.bottom='auto';pod.style.left=Math.max(0,ox+(e.clientX-sx))+'px';pod.style.top=Math.max(0,oy+(e.clientY-sy))+'px';});
+  document.addEventListener('mousemove',function(e){if(!drag)return;pod.style.right='auto';pod.style.bottom='auto';pod.style.left=Math.max(0,ox+(e.clientX-sx))+'px';pod.style.top=Math.max(0,oy+(e.clientY-sy))+'px';syncDockedSessionToChat();});
   document.addEventListener('mouseup',function(){drag=false;});
+})();
+
+// ── Session panel drag + docking ────────────────────────────────
+(function(){
+  var panel = G('session-panel'), hdr = panel.querySelector('.sp2-hdr');
+  var drag = false, ox = 0, oy = 0, sx = 0, sy = 0;
+  hdr.addEventListener('mousedown', function(e){
+    if(e.target.classList.contains('hbtn')) return;
+    var rr = panel.getBoundingClientRect();
+    drag = true;
+    sx = e.clientX;
+    sy = e.clientY;
+    ox = rr.left;
+    oy = rr.top;
+    if(sessionDockState.docked) undockSessionPanel();
+    e.preventDefault();
+  });
+  document.addEventListener('mousemove', function(e){
+    if(!drag) return;
+    var left = ox + (e.clientX - sx);
+    var top = oy + (e.clientY - sy);
+    setSessionPanelPosition(left, top);
+    queueSessionDock(panel.getBoundingClientRect());
+  });
+  document.addEventListener('mouseup', function(){
+    if(!drag) return;
+    drag = false;
+    clearSessionDockTimer();
+    if(!sessionDockState.docked) setSessionDockPreview(false);
+  });
+  window.addEventListener('resize', function(){
+    if(!panel.classList.contains('open')) return;
+    if(sessionDockState.docked) syncDockedSessionToChat();
+    else if(panel.style.left && panel.style.top){
+      var rr = panel.getBoundingClientRect();
+      setSessionPanelPosition(rr.left, rr.top);
+    }
+  });
 })();
 
 // ── Loading veil ──────────────────────────────────────────────
