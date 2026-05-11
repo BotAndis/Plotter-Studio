@@ -3099,14 +3099,16 @@ try{
 // ═══════════════════════════════════════════════════════════
 (function() {
   var pph    = document.getElementById('pph');
+  var previewContainer = document.getElementById('prv') || pph;
   var canvas = document.getElementById('preview-anim-canvas');
   if (!canvas || !pph) return;
   var ctx = canvas.getContext('2d');
   var W = 0, H = 0;
-  var NUM   = 180;
+  var NUM   = 440;
+  var TIME_SCALE = 0.5;
   var FOV   = 420;
   var DEPTH = 260;
-  var mouse = { x: -9999, y: -9999, inside: false };
+  var mouse = { x: -9999, y: -9999, tx: -9999, ty: -9999, sx: -9999, sy: -9999, inside: false };
 
   function getSize() {
     // #pph is position:absolute inside #prv — use #prv for dimensions
@@ -3164,7 +3166,7 @@ try{
     if (sz.w !== W || sz.h !== H) init();
     if (W === 0 || H === 0) { requestAnimationFrame(tick); return; }
 
-    var now = performance.now();
+    var now = performance.now() * TIME_SCALE;
     var cx = W / 2, cy = H / 2;
 
     // detect light/dark from CSS var
@@ -3179,34 +3181,41 @@ try{
     ctx.fillRect(0, 0, W, H);
     ctx.globalAlpha = 1;
 
+    if (mouse.inside) {
+      mouse.sx += (mouse.tx - mouse.sx) * 0.08;
+      mouse.sy += (mouse.ty - mouse.sy) * 0.08;
+      mouse.x = mouse.sx;
+      mouse.y = mouse.sy;
+    }
+
     pts.forEach(function(p) {
       var tx = p.bx + Math.sin(now * p.fx + p.px) * p.ax;
       var ty = p.by + Math.cos(now * p.fy + p.py) * p.ay;
       var tz = p.bz + Math.sin(now * p.fz + p.pz) * p.az;
 
-      p.vx += (tx - p.x) * 0.025;
-      p.vy += (ty - p.y) * 0.025;
-      p.vz += (tz - p.z) * 0.018;
+      p.vx += (tx - p.x) * 0.011;
+      p.vy += (ty - p.y) * 0.011;
+      p.vz += (tz - p.z) * 0.008;
 
       if (mouse.inside) {
         var projZ = FOV / (FOV + p.z + DEPTH);
         var sx0 = cx + p.x * projZ;
         var sy0 = cy + p.y * projZ;
-        var dx = sx0 - mouse.x, dy = sy0 - mouse.y;
-        var d2 = dx*dx + dy*dy, R = 190;
+        var dx = sx0 - mouse.sx, dy = sy0 - mouse.sy;
+        var d2 = dx*dx + dy*dy, R = 95;
         if (d2 < R*R && d2 > 1) {
           var dist = Math.sqrt(d2);
-          var force = Math.pow(1 - dist / R, 1.4) * 2.6;
+          var force = Math.pow(1 - dist / R, 1.4) * 1.45;
           var angle = Math.atan2(dy, dx);
           var fx = Math.cos(angle) * force;
           var fy = Math.sin(angle) * force;
-          p.vx += fx * 3.2;
-          p.vy += fy * 3.2;
-          p.vz -= force * 15;
+          p.vx += fx * 1.8;
+          p.vy += fy * 1.8;
+          p.vz -= force * 8;
         }
       }
 
-      p.vx *= 0.94; p.vy *= 0.94; p.vz *= 0.92;
+      p.vx *= 0.86; p.vy *= 0.86; p.vz *= 0.84;
       p.x += p.vx; p.y += p.vy; p.z += p.vz;
 
       var zOff = p.z + DEPTH;
@@ -3230,14 +3239,28 @@ try{
 
   function updatePreviewMouse(e) {
     var rect = canvas.getBoundingClientRect();
-    mouse.x = e.clientX - rect.left;
-    mouse.y = e.clientY - rect.top;
+    mouse.tx = e.clientX - rect.left;
+    mouse.ty = e.clientY - rect.top;
+    if (!mouse.inside) {
+      mouse.sx = mouse.tx;
+      mouse.sy = mouse.ty;
+      mouse.x = mouse.tx;
+      mouse.y = mouse.ty;
+    }
     mouse.inside = true;
   }
   var moveEvt = window.PointerEvent ? 'pointermove' : 'mousemove';
-  pph.addEventListener(moveEvt, updatePreviewMouse);
-  pph.addEventListener('mouseenter', function() { mouse.inside = true; });
-  pph.addEventListener('mouseleave', function() { mouse.inside = false; });
+  previewContainer.addEventListener(moveEvt, updatePreviewMouse);
+  previewContainer.addEventListener('mouseenter', function() { mouse.inside = true; });
+  previewContainer.addEventListener('mouseleave', function() {
+    mouse.inside = false;
+    mouse.x = -9999;
+    mouse.y = -9999;
+    mouse.tx = -9999;
+    mouse.ty = -9999;
+    mouse.sx = -9999;
+    mouse.sy = -9999;
+  });
 
   // init after layout — retry a few times to catch lazy flex layout
   setTimeout(init, 50);
