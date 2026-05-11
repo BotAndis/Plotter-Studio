@@ -328,9 +328,13 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);font
   background:var(--surf);border:1px solid var(--brdhi);
   border-radius:8px;box-shadow:0 10px 36px rgba(0,0,0,.65);
   display:none;flex-direction:column;overflow:hidden;max-height:420px;
+  transition:box-shadow .18s,border-color .18s;
 }
 #session-panel.open{display:flex}
-.sp2-hdr{height:36px;background:var(--surf2);border-bottom:1px solid var(--brd);display:flex;align-items:center;padding:0 12px;gap:8px;flex-shrink:0}
+.sp2-hdr{height:36px;background:var(--surf2);border-bottom:1px solid var(--brd);display:flex;align-items:center;padding:0 12px;gap:8px;flex-shrink:0;cursor:grab;user-select:none}
+.sp2-hdr:active{cursor:grabbing}
+.session-dock-target{box-shadow:0 0 0 1px rgba(192,104,32,.55),0 12px 54px rgba(192,104,32,.22)}
+#session-panel.docking{border-color:var(--acc);box-shadow:0 0 0 1px rgba(192,104,32,.5),0 12px 46px rgba(0,0,0,.72)}
 .sp2-title{font-size:9px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--txhi);flex:1}
 #session-list-wrap{flex:1;overflow-y:auto;min-height:0}
 #session-list{display:flex;flex-direction:column}
@@ -3125,11 +3129,104 @@ function loadSession(s){
   if(s.currentTemplate) setActiveTpl(s.currentTemplate);
   restorePanels(); updateThinkingBar();
 }
-function openSessionPanel(){ renderSessionList(); G('session-panel').classList.add('open'); G('session-overlay').classList.add('open'); }
-function closeSessionPanel(){ G('session-panel').classList.remove('open'); G('session-overlay').classList.remove('open'); }
-G('session-btn').addEventListener('click',function(e){e.stopPropagation();openSessionPanel();});
+function clampSessionPanelPosition(left, top){
+  var panel = G('session-panel');
+  var maxLeft = Math.max(0, window.innerWidth - panel.offsetWidth);
+  var maxTop = Math.max(0, window.innerHeight - panel.offsetHeight);
+  return {
+    left: Math.min(Math.max(0, left), maxLeft),
+    top: Math.min(Math.max(0, top), maxTop)
+  };
+}
+function setSessionPanelPosition(left, top){
+  var pos = clampSessionPanelPosition(left, top);
+  var panel = G('session-panel');
+  panel.style.right = 'auto';
+  panel.style.bottom = 'auto';
+  panel.style.left = pos.left + 'px';
+  panel.style.top = pos.top + 'px';
+}
+var sessionDockState = {
+  docked: false,
+  holdTimer: null,
+  holdDelay: 360,
+  gap: 10,
+  leftOffset: 0
+};
+function clearSessionDockTimer(){
+  if(sessionDockState.holdTimer){
+    clearTimeout(sessionDockState.holdTimer);
+    sessionDockState.holdTimer = null;
+  }
+}
+function setSessionDockPreview(active){
+  G('session-panel').classList.toggle('docking', !!active);
+  G('chat').classList.toggle('session-dock-target', !!active);
+}
+function getDockedSessionTarget(chatRect){
+  return clampSessionPanelPosition(chatRect.left + sessionDockState.leftOffset, chatRect.bottom + sessionDockState.gap);
+}
+function syncDockedSessionToChat(){
+  if(!sessionDockState.docked) return;
+  var chatRect = G('chat').getBoundingClientRect();
+  var target = getDockedSessionTarget(chatRect);
+  setSessionPanelPosition(target.left, target.top);
+}
+function dockSessionToChat(){
+  clearSessionDockTimer();
+  sessionDockState.docked = true;
+  sessionDockState.leftOffset = 0;
+  setSessionDockPreview(false);
+  syncDockedSessionToChat();
+}
+function undockSessionPanel(){
+  clearSessionDockTimer();
+  setSessionDockPreview(false);
+  sessionDockState.docked = false;
+}
+function sessionCanDock(rect){
+  var chatRect = G('chat').getBoundingClientRect();
+  var nearBottom = Math.abs(rect.top - (chatRect.bottom + sessionDockState.gap)) <= 26;
+  var overlap = Math.min(rect.right, chatRect.right) - Math.max(rect.left, chatRect.left);
+  return nearBottom && overlap >= Math.min(rect.width, chatRect.width) * 0.35;
+}
+function queueSessionDock(rect){
+  if(sessionDockState.docked) return;
+  if(sessionCanDock(rect)){
+    setSessionDockPreview(true);
+    if(!sessionDockState.holdTimer){
+      sessionDockState.holdTimer = setTimeout(function(){
+        dockSessionToChat();
+      }, sessionDockState.holdDelay);
+    }
+  } else {
+    clearSessionDockTimer();
+    setSessionDockPreview(false);
+  }
+}
+function openSessionPanel(){
+  var panel = G('session-panel');
+  renderSessionList();
+  panel.classList.add('open');
+  G('session-overlay').classList.remove('open');
+  if(sessionDockState.docked) syncDockedSessionToChat();
+  else if(!panel.style.left && !panel.style.top){
+    var chatRect = G('chat').getBoundingClientRect();
+    setSessionPanelPosition(chatRect.left - Math.max(0, panel.offsetWidth - chatRect.width), Math.max(16, chatRect.top + 60));
+  }
+}
+function closeSessionPanel(){
+  clearSessionDockTimer();
+  setSessionDockPreview(false);
+  G('session-panel').classList.remove('open');
+  G('session-overlay').classList.remove('open');
+}
+G('session-btn').addEventListener('click',function(e){
+  e.stopPropagation();
+  if(G('session-panel').classList.contains('open')) closeSessionPanel();
+  else openSessionPanel();
+});
 G('session-close').addEventListener('click',closeSessionPanel);
-G('session-overlay').addEventListener('click',closeSessionPanel);
 G('session-save-btn').addEventListener('click',saveCurrentSession);
 G('session-autosave-btn').addEventListener('click',toggleAutosave);
 G('session-load-btn').addEventListener('click',function(){ loadSessionByIndex(selectedSessionIndex); });
@@ -4038,14 +4135,52 @@ G('cors-proxy-clear').addEventListener('click', function() {
 
 // ── Chat minimise ─────────────────────────────────────────────
 var mini=false;
-G('ctog').addEventListener('click',function(){mini=!mini;G('chat').classList.toggle('mini',mini);G('ctog').textContent=mini?'+':'−';});
+G('ctog').addEventListener('click',function(){mini=!mini;G('chat').classList.toggle('mini',mini);G('ctog').textContent=mini?'+':'−';syncDockedSessionToChat();});
 
 // ── Drag ──────────────────────────────────────────────────────
 (function(){
   var pod=G('chat'),hdr=G('chdr');var drag=false,ox=0,oy=0,sx=0,sy=0;
   hdr.addEventListener('mousedown',function(e){if(e.target.classList.contains('hbtn'))return;drag=true;sx=e.clientX;sy=e.clientY;var rr=pod.getBoundingClientRect();ox=rr.left;oy=rr.top;e.preventDefault();});
-  document.addEventListener('mousemove',function(e){if(!drag)return;pod.style.right='auto';pod.style.bottom='auto';pod.style.left=Math.max(0,ox+(e.clientX-sx))+'px';pod.style.top=Math.max(0,oy+(e.clientY-sy))+'px';});
+  document.addEventListener('mousemove',function(e){if(!drag)return;pod.style.right='auto';pod.style.bottom='auto';pod.style.left=Math.max(0,ox+(e.clientX-sx))+'px';pod.style.top=Math.max(0,oy+(e.clientY-sy))+'px';syncDockedSessionToChat();});
   document.addEventListener('mouseup',function(){drag=false;});
+})();
+
+// ── Session panel drag + docking ────────────────────────────────
+(function(){
+  var panel = G('session-panel'), hdr = panel.querySelector('.sp2-hdr');
+  var drag = false, ox = 0, oy = 0, sx = 0, sy = 0;
+  hdr.addEventListener('mousedown', function(e){
+    if(e.target.classList.contains('hbtn')) return;
+    var rr = panel.getBoundingClientRect();
+    drag = true;
+    sx = e.clientX;
+    sy = e.clientY;
+    ox = rr.left;
+    oy = rr.top;
+    if(sessionDockState.docked) undockSessionPanel();
+    e.preventDefault();
+  });
+  document.addEventListener('mousemove', function(e){
+    if(!drag) return;
+    var left = ox + (e.clientX - sx);
+    var top = oy + (e.clientY - sy);
+    setSessionPanelPosition(left, top);
+    queueSessionDock(panel.getBoundingClientRect());
+  });
+  document.addEventListener('mouseup', function(){
+    if(!drag) return;
+    drag = false;
+    clearSessionDockTimer();
+    if(!sessionDockState.docked) setSessionDockPreview(false);
+  });
+  window.addEventListener('resize', function(){
+    if(!panel.classList.contains('open')) return;
+    if(sessionDockState.docked) syncDockedSessionToChat();
+    else if(panel.style.left && panel.style.top){
+      var rr = panel.getBoundingClientRect();
+      setSessionPanelPosition(rr.left, rr.top);
+    }
+  });
 })();
 
 // ── Loading veil ──────────────────────────────────────────────
